@@ -2,13 +2,13 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://pgcgicxtcxeubuoqusic.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnY2dpY3h0Y3hldWJ1b3F1c2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA5ODU5MzQsImV4cCI6MjA2NjU2MTkzNH0.jQRaDI9_OtPKSuC7BZWDBSbBKw5kk1HxAwICmrcpAiM";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Ensure we have valid URLs before creating the client
 if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   console.error('Supabase configuration missing');
-  throw new Error('Supabase URL and key are required');
+  throw new Error('Supabase URL and key are required. Please check your environment variables.');
 }
 
 // Import the supabase client like this:
