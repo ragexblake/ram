@@ -59,7 +59,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
         return <Dashboard user={profile} onStartSession={onStartSession} />;
       
       case 'courses':
-        return <AdminCoursesView user={profile} onStartSession={onStartSession} />;
+        return <AdminCoursesView user={profile} onStartSession={onStartSession} onReadCourse={onReadCourse} />;
       
       case 'course-creator':
         return <CourseCreator userId={profile?.id} onCourseCreated={onCourseCreated} />;

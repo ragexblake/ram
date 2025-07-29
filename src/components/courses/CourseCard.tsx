@@ -99,7 +99,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
             {onReadCourse && (
               <button
                 onClick={() => onReadCourse(course)}
-                className="flex items-center space-x-1 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
+                className="flex items-center space-x-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm border"
               >
                 <BookOpen className="h-4 w-4" />
                 <span>Read</span>

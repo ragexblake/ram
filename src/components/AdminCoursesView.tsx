@@ -20,6 +20,7 @@ import TeamAssignmentModal from './courses/TeamAssignmentModal';
 interface AdminCoursesViewProps {
   user: any;
   onStartSession: (course: any) => void;
+  onReadCourse?: (course: any) => void;
 }
 
 interface CourseWithAssignments {
@@ -34,7 +35,7 @@ interface CourseWithAssignments {
   assigned_teams: string[];
 }
 
-const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSession }) => {
+const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSession, onReadCourse }) => {
   const [courses, setCourses] = useState<CourseWithAssignments[]>([]);
   const [people, setPeople] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -221,6 +222,12 @@ const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSessio
     loadCourses();
   };
 
+  const handleReadCourse = (course: any) => {
+    if (onReadCourse) {
+      onReadCourse(course);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'published':
@@ -345,6 +352,14 @@ const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSessio
           >
             <Play className="h-4 w-4" />
             <span>Test</span>
+          </button>
+
+          <button
+            onClick={() => handleReadCourse(course)}
+            className="flex items-center space-x-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm border"
+          >
+            <BookOpen className="h-4 w-4" />
+            <span>Read</span>
           </button>
 
           {isDraft ? (
