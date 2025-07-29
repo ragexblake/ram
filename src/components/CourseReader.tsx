@@ -56,13 +56,23 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
   const { toast } = useToast();
 
   useEffect(() => {
-    generateCourseContent();
+    loadCourseContent();
   }, [course]);
 
-  const generateCourseContent = async () => {
+  const loadCourseContent = async () => {
     try {
       setLoading(true);
       
+      // First check if course already has generated content
+      if (course.course_plan?.courseContent) {
+        console.log('Loading existing course content from database');
+        setCourseContent(course.course_plan.courseContent);
+        setLoading(false);
+        return;
+      }
+      
+      // If no existing content, generate new content
+      console.log('Generating new course content');
       const response = await supabase.functions.invoke('generate-course-content', {
         body: { course }
       });
@@ -72,7 +82,11 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
       }
 
       if (response.data?.courseContent?.sections) {
-        setCourseContent(response.data.courseContent.sections);
+        const generatedContent = response.data.courseContent.sections;
+        setCourseContent(generatedContent);
+        
+        // Save the generated content to database for future use
+        saveCourseContentToDatabase(generatedContent);
       } else {
         throw new Error('Invalid course content structure');
       }
