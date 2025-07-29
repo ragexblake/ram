@@ -37,7 +37,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   onStartSession,
   onCourseCreated,
   currentSession,
-  onSessionPerformanceComplete
+  onSessionPerformanceComplete,
   onReadCourse,
   courseReaderData,
   onExitCourseReader
