@@ -344,7 +344,6 @@ const AcceptInvitation: React.FC = () => {
             role: invitation.role,
           },
           captchaToken,
-          emailRedirectTo: window.location.origin,
         }
       });
 
@@ -420,8 +419,7 @@ const AcceptInvitation: React.FC = () => {
         email: invitation.invitee_email,
         password: loginPassword,
         options: {
-          captchaToken,
-          emailRedirectTo: window.location.origin
+          captchaToken
         }
       });
 

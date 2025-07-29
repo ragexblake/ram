@@ -146,7 +146,7 @@ serve(async (req) => {
         console.log('Invitation stored in database:', inviteData)
 
         // NEW: Use clean URL structure for Vercel compatibility
-        const baseUrl = Deno.env.get('SITE_URL') || 'http://localhost:8080'
+        const baseUrl = 'https://pgcgicxtcxeubuoqusic.supabase.co'
         const inviteUrl = `${baseUrl}/accept-invitation/${magicToken}`
         
         const emailResponse = await fetch('https://api.resend.com/emails', {
