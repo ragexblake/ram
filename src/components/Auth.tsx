@@ -295,9 +295,37 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           />
           <h1 className="text-3xl font-bold text-gray-900 mb-2">ONEGO Learning</h1>
           <p className="text-gray-600">AI-Powered Training Platform</p>
+        </div>
+
+        <form onSubmit={handleAuth} className="space-y-6">
+          {isSignUp && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
                   />
                 </div>
-          disabled={loading}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Last Name
+                  </label>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
+                  />
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Company Name
@@ -340,37 +368,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             />
           </div>
 
-          <div className="flex justify-center">
-            <Turnstile
-              siteKey="0x4AAAAAABkelv713e06-flZ"
-              onSuccess={(token) => {
-                console.log('CAPTCHA completed successfully, token received:', token?.substring(0, 20) + '...');
-                setCaptchaToken(token);
-              }}
-              onError={(error) => {
-                console.error('CAPTCHA error:', error);
-                setCaptchaToken('');
-                toast({
-                  title: "CAPTCHA Error",
-                  description: "Failed to load CAPTCHA. Please refresh the page.",
-                  variant: "destructive",
-                });
-              }}
-              onExpire={() => {
-                console.log('CAPTCHA expired, clearing token');
-                setCaptchaToken('');
-                toast({
-                  title: "CAPTCHA Expired",
-                  description: "Please complete the CAPTCHA again.",
-                  variant: "destructive",
-                });
-              }}
-            />
-          </div>
-
           <button
             type="submit"
-            disabled={loading || !captchaToken}
+            disabled={loading}
             className="w-full bg-green-500 text-white py-3 px-4 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 font-semibold"
           >
             {loading ? 'Loading...' : 
