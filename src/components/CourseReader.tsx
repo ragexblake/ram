@@ -68,18 +68,27 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
       // First check if course already has generated content
       if (course.course_plan?.courseContent) {
         console.log('Loading existing course content from database');
-        setCourseContent(course.course_plan.courseContent);
+        setCourseContent(course.course_plan.courseContent.sections || course.course_plan.courseContent);
         setLoading(false);
         return;
       }
       
       // If no existing content, generate new content
       console.log('Generating new course content');
-      const response = await supabase.functions.invoke('generate-course-content', {
+      
+      // Add timeout to the function call
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 30000)
+      );
+      
+      const functionPromise = supabase.functions.invoke('generate-course-content', {
         body: { course }
       });
+      
+      const response = await Promise.race([functionPromise, timeoutPromise]);
 
       if (response.error) {
+        console.error('Function invocation error:', response.error);
         throw new Error(response.error.message);
       }
 
@@ -88,36 +97,175 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
         setCourseContent(generatedContent);
         
         // Save the generated content to database for future use
-        saveCourseContentToDatabase(generatedContent);
+        await saveCourseContentToDatabase(generatedContent);
       } else {
+        console.error('Invalid response structure:', response.data);
         throw new Error('Invalid course content structure');
       }
     } catch (error) {
       console.error('Error generating course content:', error);
+      
+      // Show more specific error message
+      let errorMessage = "Failed to load course content. Please try again.";
+      if (error.message.includes('timeout')) {
+        errorMessage = "Content generation timed out. Please try again.";
+      } else if (error.message.includes('API key')) {
+        errorMessage = "API configuration issue. Please contact support.";
+      }
+      
       toast({
         title: "Error",
-        description: "Failed to load course content. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
       
-      // Fallback to basic structure
-      setCourseContent([
-        {
-          id: "section-1",
-          title: "Introduction",
-          description: "Course overview",
-          subsections: [
-            {
-              id: "subsection-1-1",
-              title: "Welcome",
-              content: `<h2>Welcome to ${course.course_title}</h2><p>This course will help you master the concepts and skills needed for success.</p>`
-            }
-          ]
-        }
-      ]);
+      // Enhanced fallback content based on course data
+      const fallbackContent = createFallbackContent(course);
+      setCourseContent(fallbackContent);
     } finally {
       setLoading(false);
     }
+  };
+
+  const createFallbackContent = (course: any): CourseSection[] => {
+    const trackType = course.track_type || 'General';
+    const courseTitle = course.course_title || 'Course';
+    const goal = course.course_plan?.goal || 'learning objectives';
+    
+    return [
+      {
+        id: "section-1",
+        title: "Introduction",
+        description: "Course overview and objectives",
+        subsections: [
+          {
+            id: "subsection-1-1",
+            title: "Welcome",
+            content: `
+              <h1>Welcome to ${courseTitle}</h1>
+              <p>This ${trackType.toLowerCase()} course is designed to help you achieve your learning goals.</p>
+              
+              <h2>Course Overview</h2>
+              <p>Throughout this course, you will:</p>
+              <ul>
+                <li><strong>Learn key concepts</strong> related to ${goal}</li>
+                <li><strong>Apply practical skills</strong> through interactive exercises</li>
+                <li><strong>Build confidence</strong> in your abilities</li>
+                <li><strong>Track your progress</strong> as you advance</li>
+              </ul>
+              
+              <h3>Getting Started</h3>
+              <p>Use the navigation on the left to move through the course sections. Each section builds upon the previous one, so we recommend following the order provided.</p>
+              
+              <p><em>Note: This is basic course content. For enhanced content generation, please ensure all system requirements are met.</em></p>
+            `
+          },
+          {
+            id: "subsection-1-2",
+            title: "Learning Objectives",
+            content: `
+              <h2>What You'll Achieve</h2>
+              <p>By the end of this course, you will have:</p>
+              
+              <ul>
+                <li>A solid understanding of core concepts</li>
+                <li>Practical skills you can apply immediately</li>
+                <li>Confidence to tackle real-world challenges</li>
+                <li>A foundation for continued learning</li>
+              </ul>
+              
+              <h3>Course Structure</h3>
+              <p>This course is organized into progressive sections that build upon each other:</p>
+              <ol>
+                <li><strong>Introduction</strong> - Overview and objectives</li>
+                <li><strong>Fundamentals</strong> - Core concepts and principles</li>
+                <li><strong>Application</strong> - Practical skills and exercises</li>
+                <li><strong>Mastery</strong> - Advanced topics and next steps</li>
+              </ol>
+            `,
+            hasQuiz: true
+          }
+        ]
+      },
+      {
+        id: "section-2",
+        title: "Fundamentals",
+        description: "Core concepts and principles",
+        subsections: [
+          {
+            id: "subsection-2-1",
+            title: "Key Concepts",
+            content: `
+              <h2>Understanding the Basics</h2>
+              <p>Let's start with the fundamental concepts that form the foundation of ${goal}.</p>
+              
+              <h3>Core Principles</h3>
+              <ul>
+                <li><strong>Principle 1:</strong> Understanding the fundamentals</li>
+                <li><strong>Principle 2:</strong> Applying knowledge effectively</li>
+                <li><strong>Principle 3:</strong> Continuous improvement</li>
+              </ul>
+              
+              <h3>Why This Matters</h3>
+              <p>These concepts are essential because they provide the framework for everything else you'll learn in this course.</p>
+            `
+          }
+        ]
+      },
+      {
+        id: "section-3",
+        title: "Application",
+        description: "Practical skills and real-world application",
+        subsections: [
+          {
+            id: "subsection-3-1",
+            title: "Practical Skills",
+            content: `
+              <h2>Putting Knowledge into Practice</h2>
+              <p>Now that you understand the fundamentals, let's explore how to apply these concepts in real situations.</p>
+              
+              <h3>Key Skills</h3>
+              <ul>
+                <li>Problem-solving techniques</li>
+                <li>Decision-making frameworks</li>
+                <li>Communication strategies</li>
+                <li>Implementation methods</li>
+              </ul>
+              
+              <h3>Real-World Examples</h3>
+              <p>Consider how these skills apply in your specific context and industry.</p>
+            `,
+            hasQuiz: true
+          }
+        ]
+      },
+      {
+        id: "section-4",
+        title: "Next Steps",
+        description: "Advanced topics and continued learning",
+        subsections: [
+        {
+          id: "subsection-4-1",
+          title: "Continued Learning",
+          content: `
+            <h2>Your Learning Journey Continues</h2>
+            <p>Congratulations on completing this course! Here's how to continue your development:</p>
+            
+            <h3>Next Steps</h3>
+            <ul>
+              <li><strong>Practice regularly:</strong> Apply what you've learned</li>
+              <li><strong>Seek feedback:</strong> Get input from others</li>
+              <li><strong>Stay updated:</strong> Keep learning new developments</li>
+              <li><strong>Share knowledge:</strong> Teach others what you've learned</li>
+            </ul>
+            
+            <h3>Additional Resources</h3>
+            <p>Consider exploring related courses and materials to deepen your expertise.</p>
+          `
+        }
+        ]
+      }
+    ];
   };
 
   const generateQuizQuestions = (sectionId: string, subsectionId: string): QuizQuestion[] => {
