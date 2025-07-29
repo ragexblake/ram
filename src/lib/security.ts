@@ -151,6 +151,7 @@ export const getCSPHeader = (): string => {
     "img-src 'self' data: https:",
     "font-src 'self' data:",
     "connect-src 'self' https://pgcgicxtcxeubuoqusic.supabase.co wss://pgcgicxtcxeubuoqusic.supabase.co",
+    "connect-src 'self' https://jflcqeemzbggdvusyohk.supabase.co wss://jflcqeemzbggdvusyohk.supabase.co",
     "media-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
