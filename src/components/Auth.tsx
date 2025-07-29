@@ -50,7 +50,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.protocol}//${window.location.host}`,
+          redirectTo: window.location.origin,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
