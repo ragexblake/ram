@@ -32,7 +32,7 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({
   onAssignHover,
   getCourseProgress,
   getCourseStatus,
-  showAdminActions = false
+  showAdminActions = false,
   onReadCourse
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
