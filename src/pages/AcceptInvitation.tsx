@@ -293,6 +293,9 @@ const AcceptInvitation: React.FC = () => {
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email: invitation.invitee_email,
+        options: {
+          emailRedirectTo: `${window.location.protocol}//${window.location.host}`
+        }
       });
 
       if (error) throw error;
@@ -344,7 +347,7 @@ const AcceptInvitation: React.FC = () => {
             role: invitation.role,
           },
           captchaToken,
-          emailRedirectTo: window.location.origin,
+          emailRedirectTo: `${window.location.protocol}//${window.location.host}`,
         }
       });
 
@@ -420,7 +423,8 @@ const AcceptInvitation: React.FC = () => {
         email: invitation.invitee_email,
         password: loginPassword,
         options: {
-          captchaToken
+          captchaToken,
+          emailRedirectTo: `${window.location.protocol}//${window.location.host}`
         }
       });
 
