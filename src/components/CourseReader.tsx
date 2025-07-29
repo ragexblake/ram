@@ -449,44 +449,9 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
                                 <span className="text-gray-700">{option}</span>
                               </label>
                             ))}
-                            
-                            {/* Edit and Delete buttons */}
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1 ml-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditSubsection(subsection);
-                                }}
-                                className="p-1 hover:bg-blue-100 rounded"
-                                title="Edit topic"
-                              >
-                                <Edit className="h-3 w-3 text-blue-600" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteSubsection(sectionIndex, subsectionIndex);
-                                }}
-                                className="p-1 hover:bg-red-100 rounded"
-                                title="Delete topic"
-                              >
-                                <Trash2 className="h-3 w-3 text-red-600" />
-                              </button>
-                            </div>
                           </div>
                         </div>
                       ))}
-                      
-                      {/* Add Topic Button for current section */}
-                      {sectionIndex === currentSectionIndex && (
-                        <button
-                          onClick={() => setShowAddTopic(true)}
-                          className="w-full flex items-center justify-center p-3 text-blue-600 hover:bg-blue-50 border-t border-gray-200"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          <span className="text-sm">Add Topic to This Section</span>
-                        </button>
-                      )}
                       
                       <div className="pt-6">
                         <Button
@@ -632,42 +597,78 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
               {expandedSections.has(section.id) && section.subsections && (
                 <div className="bg-gray-50">
                   {section.subsections.map((subsection, subsectionIndex) => (
-                    <button
-                      key={subsection.id}
-                      onClick={() => navigateToSection(sectionIndex, subsectionIndex)}
-                      className={`w-full flex items-center p-3 pl-12 text-left hover:bg-gray-100 ${
-                        sectionIndex === currentSectionIndex && subsectionIndex === currentSubsectionIndex
-                          ? 'bg-blue-900 text-white'
-                          : ''
-                      }`}
-                    >
+                    <div key={subsection.id} className="group">
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          markAsCompleted(subsection.id);
-                        }}
-                        className="mr-3"
+                        onClick={() => navigateToSection(sectionIndex, subsectionIndex)}
+                        className={`w-full flex items-center p-3 pl-12 text-left hover:bg-gray-100 ${
+                          sectionIndex === currentSectionIndex && subsectionIndex === currentSubsectionIndex
+                            ? 'bg-blue-900 text-white'
+                            : ''
+                        }`}
                       >
-                        {completedItems.has(subsection.id) ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Circle className="h-4 w-4 text-gray-400" />
-                        )}
-                      </button>
-                      <span className={`text-sm flex-1 ${
-                        sectionIndex === currentSectionIndex && subsectionIndex === currentSubsectionIndex
-                          ? 'font-medium text-white'
-                          : 'text-gray-600'
-                      }`}>
-                        {subsection.title}
-                      </span>
-                      {subsection.hasQuiz && (
-                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded ml-2">
-                          Quiz
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markAsCompleted(subsection.id);
+                          }}
+                          className="mr-3"
+                        >
+                          {completedItems.has(subsection.id) ? (
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <Circle className="h-4 w-4 text-gray-400" />
+                          )}
+                        </button>
+                        <span className={`text-sm flex-1 ${
+                          sectionIndex === currentSectionIndex && subsectionIndex === currentSubsectionIndex
+                            ? 'font-medium text-white'
+                            : 'text-gray-600'
+                        }`}>
+                          {subsection.title}
                         </span>
-                      )}
-                    </button>
+                        {subsection.hasQuiz && (
+                          <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded ml-2">
+                            Quiz
+                          </span>
+                        )}
+                        
+                        {/* Edit and Delete buttons */}
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1 ml-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditSubsection(subsection);
+                            }}
+                            className="p-1 hover:bg-blue-100 rounded"
+                            title="Edit topic"
+                          >
+                            <Edit className="h-3 w-3 text-blue-600" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSubsection(sectionIndex, subsectionIndex);
+                            }}
+                            className="p-1 hover:bg-red-100 rounded"
+                            title="Delete topic"
+                          >
+                            <Trash2 className="h-3 w-3 text-red-600" />
+                          </button>
+                        </div>
+                      </button>
+                    </div>
                   ))}
+                  
+                  {/* Add Topic Button for current section */}
+                  {sectionIndex === currentSectionIndex && (
+                    <button
+                      onClick={() => setShowAddTopic(true)}
+                      className="w-full flex items-center justify-center p-3 text-blue-600 hover:bg-blue-50 border-t border-gray-200"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      <span className="text-sm">Add Topic to This Section</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -891,37 +892,6 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-export default CourseReader;
-              <Button
-                variant="outline"
-                onClick={navigatePrevious}
-                disabled={!canNavigatePrevious}
-                className="flex items-center space-x-2"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                <span>Previous</span>
-              </Button>
-
-              <div className="text-sm text-gray-500">
-                Section {currentSectionIndex + 1} of {courseContent.length}
-              </div>
-
-              <Button
-                onClick={navigateNext}
-                disabled={!canNavigateNext}
-                className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700"
-              >
-                <span>Next</span>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
