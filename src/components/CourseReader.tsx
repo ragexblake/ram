@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, CheckCircle, Circle, ArrowLeft, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, CheckCircle, Circle, ArrowLeft, MoreHorizontal, Edit, Plus, Trash2, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -44,6 +46,13 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
   const [showQuiz, setShowQuiz] = useState(false);
   const [currentQuizAnswers, setCurrentQuizAnswers] = useState<{ [key: string]: number }>({});
   const [quizResults, setQuizResults] = useState<{ [key: string]: boolean }>({});
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingSubsection, setEditingSubsection] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [showAddTopic, setShowAddTopic] = useState(false);
+  const [newTopicTitle, setNewTopicTitle] = useState('');
+  const [newTopicContent, setNewTopicContent] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -251,6 +260,95 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
     }
   };
 
+  const handleEditSubsection = (subsection: CourseSubsection) => {
+    setEditingSubsection(subsection.id);
+    setEditTitle(subsection.title);
+    setEditContent(subsection.content);
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = () => {
+    setCourseContent(prev => prev.map(section => ({
+      ...section,
+      subsections: section.subsections.map(sub => 
+        sub.id === editingSubsection 
+          ? { ...sub, title: editTitle, content: editContent }
+          : sub
+      )
+    })));
+    
+    setIsEditing(false);
+    setEditingSubsection(null);
+    setEditTitle('');
+    setEditContent('');
+    
+    toast({
+      title: "Content Updated",
+      description: "The course content has been updated successfully.",
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditingSubsection(null);
+    setEditTitle('');
+    setEditContent('');
+  };
+
+  const handleDeleteSubsection = (sectionIndex: number, subsectionIndex: number) => {
+    if (confirm('Are you sure you want to delete this topic?')) {
+      setCourseContent(prev => prev.map((section, sIdx) => 
+        sIdx === sectionIndex 
+          ? {
+              ...section,
+              subsections: section.subsections.filter((_, subIdx) => subIdx !== subsectionIndex)
+            }
+          : section
+      ));
+      
+      toast({
+        title: "Topic Deleted",
+        description: "The topic has been removed from the course.",
+      });
+    }
+  };
+
+  const handleAddTopic = () => {
+    if (!newTopicTitle.trim() || !newTopicContent.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide both title and content for the new topic.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newSubsection: CourseSubsection = {
+      id: `subsection-${Date.now()}`,
+      title: newTopicTitle.trim(),
+      content: newTopicContent.trim(),
+      hasQuiz: false
+    };
+
+    setCourseContent(prev => prev.map((section, sIdx) => 
+      sIdx === currentSectionIndex 
+        ? {
+            ...section,
+            subsections: [...section.subsections, newSubsection]
+          }
+        : section
+    ));
+
+    setShowAddTopic(false);
+    setNewTopicTitle('');
+    setNewTopicContent('');
+    
+    toast({
+      title: "Topic Added",
+      description: "New topic has been added to the course.",
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen bg-gray-100 items-center justify-center">
@@ -302,6 +400,21 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
                 {currentContent.title} - Knowledge Check
               </p>
             </div>
+            
+            {/* Course Editing Options */}
+            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <h4 className="font-semibold text-gray-800 mb-3">Course Management</h4>
+              <div className="space-y-2">
+                <Button
+                  onClick={() => setShowAddTopic(true)}
+                  size="sm"
+                  className="w-full flex items-center justify-center space-x-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add New Topic</span>
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -336,9 +449,44 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
                                 <span className="text-gray-700">{option}</span>
                               </label>
                             ))}
+                            
+                            {/* Edit and Delete buttons */}
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1 ml-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditSubsection(subsection);
+                                }}
+                                className="p-1 hover:bg-blue-100 rounded"
+                                title="Edit topic"
+                              >
+                                <Edit className="h-3 w-3 text-blue-600" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteSubsection(sectionIndex, subsectionIndex);
+                                }}
+                                className="p-1 hover:bg-red-100 rounded"
+                                title="Delete topic"
+                              >
+                                <Trash2 className="h-3 w-3 text-red-600" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
+                      
+                      {/* Add Topic Button for current section */}
+                      {sectionIndex === currentSectionIndex && (
+                        <button
+                          onClick={() => setShowAddTopic(true)}
+                          className="w-full flex items-center justify-center p-3 text-blue-600 hover:bg-blue-50 border-t border-gray-200"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          <span className="text-sm">Add Topic to This Section</span>
+                        </button>
+                      )}
                       
                       <div className="pt-6">
                         <Button
@@ -410,6 +558,22 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+            
+            {/* Course Management Section */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50">
+              <h4 className="font-semibold text-gray-800 mb-3">Course Management</h4>
+              <div className="space-y-2">
+                <Button
+                  onClick={() => setShowAddTopic(true)}
+                  size="sm"
+                  variant="outline"
+                  className="w-full flex items-center justify-center space-x-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add New Topic</span>
+                </Button>
               </div>
             </div>
           </div>
@@ -554,34 +718,184 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
         {/* Content Display */}
         <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
           <div className="max-w-4xl mx-auto">
-            {/* PDF-style Content Box */}
-            <div className="bg-white rounded-lg shadow-lg border border-gray-200 min-h-[600px]">
-              <div className="p-8">
-                <div 
-                  className="prose prose-lg max-w-none"
-                  dangerouslySetInnerHTML={{ __html: currentContent.content }}
-                />
-                
-                {/* Quiz Button */}
-                {currentContent.hasQuiz && (
-                  <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <h3 className="font-semibold text-yellow-800 mb-2">Knowledge Check Available</h3>
-                    <p className="text-yellow-700 text-sm mb-4">
-                      Test your understanding of this section with a quick quiz.
-                    </p>
-                    <Button
-                      onClick={() => setShowQuiz(true)}
-                      className="bg-yellow-600 hover:bg-yellow-700"
-                    >
-                      Take Quiz
-                    </Button>
+            {isEditing && editingSubsection ? (
+              /* Edit Mode */
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 min-h-[600px] p-8">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Edit Topic</h2>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Topic Title
+                      </label>
+                      <Input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        placeholder="Enter topic title"
+                        className="w-full"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Content (HTML supported)
+                      </label>
+                      <Textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        placeholder="Enter content with HTML formatting"
+                        rows={15}
+                        className="w-full font-mono text-sm"
+                      />
+                    </div>
+                    
+                    <div className="flex space-x-3">
+                      <Button onClick={handleSaveEdit} className="flex items-center space-x-2">
+                        <Save className="h-4 w-4" />
+                        <span>Save Changes</span>
+                      </Button>
+                      <Button onClick={handleCancelEdit} variant="outline" className="flex items-center space-x-2">
+                        <X className="h-4 w-4" />
+                        <span>Cancel</span>
+                      </Button>
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
-            </div>
+            ) : (
+              /* Reading Mode */
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 min-h-[600px]">
+                <div className="p-8">
+                  <div 
+                    className="prose prose-xl max-w-none"
+                    style={{
+                      fontSize: '18px',
+                      lineHeight: '1.7',
+                      color: '#374151'
+                    }}
+                    dangerouslySetInnerHTML={{ 
+                      __html: currentContent.content
+                        .replace(/<h1>/g, '<h1 style="font-size: 2.5rem; font-weight: 700; margin: 2rem 0 1.5rem 0; color: #111827; line-height: 1.2;">')
+                        .replace(/<h2>/g, '<h2 style="font-size: 2rem; font-weight: 600; margin: 1.75rem 0 1rem 0; color: #1f2937; line-height: 1.3;">')
+                        .replace(/<h3>/g, '<h3 style="font-size: 1.5rem; font-weight: 600; margin: 1.5rem 0 0.75rem 0; color: #374151; line-height: 1.4;">')
+                        .replace(/<h4>/g, '<h4 style="font-size: 1.25rem; font-weight: 600; margin: 1.25rem 0 0.5rem 0; color: #4b5563; line-height: 1.4;">')
+                        .replace(/<p>/g, '<p style="margin: 1rem 0; line-height: 1.7;">')
+                        .replace(/<ul>/g, '<ul style="margin: 1rem 0; padding-left: 1.5rem; line-height: 1.7;">')
+                        .replace(/<ol>/g, '<ol style="margin: 1rem 0; padding-left: 1.5rem; line-height: 1.7;">')
+                        .replace(/<li>/g, '<li style="margin: 0.5rem 0;">')
+                        .replace(/<strong>/g, '<strong style="font-weight: 600; color: #111827;">')
+                        .replace(/<em>/g, '<em style="font-style: italic; color: #4b5563;">')
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+                
+            {/* Quiz Button */}
+            {!isEditing && currentContent.hasQuiz && (
+              <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <h3 className="font-semibold text-yellow-800 mb-2">Knowledge Check Available</h3>
+                <p className="text-yellow-700 text-sm mb-4">
+                  Test your understanding of this section with a quick quiz.
+                </p>
+                <Button
+                  onClick={() => setShowQuiz(true)}
+                  className="bg-yellow-600 hover:bg-yellow-700"
+                >
+                  Take Quiz
+                </Button>
+              </div>
+            )}
 
             {/* Navigation Controls */}
-            <div className="flex justify-between items-center mt-6">
+            {!isEditing && (
+              <div className="flex justify-between items-center mt-6">
+                <Button
+                  variant="outline"
+                  onClick={navigatePrevious}
+                  disabled={!canNavigatePrevious}
+                  className="flex items-center space-x-2"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span>Previous</span>
+                </Button>
+
+                <div className="text-sm text-gray-500">
+                  Section {currentSectionIndex + 1} of {courseContent.length}
+                </div>
+
+                <Button
+                  onClick={navigateNext}
+                  disabled={!canNavigateNext}
+                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Add Topic Modal */}
+      {showAddTopic && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-xl font-semibold mb-4">Add New Topic</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Topic Title
+                </label>
+                <Input
+                  value={newTopicTitle}
+                  onChange={(e) => setNewTopicTitle(e.target.value)}
+                  placeholder="Enter topic title"
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Content (HTML supported)
+                </label>
+                <Textarea
+                  value={newTopicContent}
+                  onChange={(e) => setNewTopicContent(e.target.value)}
+                  placeholder="Enter content with HTML formatting (e.g., <h2>Heading</h2>, <p>Paragraph</p>, <ul><li>List item</li></ul>)"
+                  rows={10}
+                  className="w-full font-mono text-sm"
+                />
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <Button
+                  onClick={() => {
+                    setShowAddTopic(false);
+                    setNewTopicTitle('');
+                    setNewTopicContent('');
+                  }}
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleAddTopic} className="flex items-center space-x-2">
+                  <Plus className="h-4 w-4" />
+                  <span>Add Topic</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CourseReader;
               <Button
                 variant="outline"
                 onClick={navigatePrevious}
