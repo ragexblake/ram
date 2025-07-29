@@ -445,6 +445,7 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
     setEditingSubsection(null);
     setEditTitle('');
     setEditContent('');
+    setHasUnsavedChanges(true);
     
     toast({
       title: "Content Updated",
@@ -469,6 +470,7 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
             }
           : section
       ));
+      setHasUnsavedChanges(true);
       
       toast({
         title: "Topic Deleted",
@@ -506,6 +508,7 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
     setShowAddTopic(false);
     setNewTopicTitle('');
     setNewTopicContent('');
+    setHasUnsavedChanges(true);
     
     toast({
       title: "Topic Added",
@@ -513,6 +516,50 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
     });
   };
 
+  const saveCourseContentToDatabase = async (content: CourseSection[]) => {
+    try {
+      setIsSaving(true);
+      
+      const { error } = await supabase
+        .from('courses')
+        .update({
+          course_plan: {
+            ...course.course_plan,
+            courseContent: { sections: content }
+          },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', course.id);
+
+      if (error) throw error;
+
+      console.log('Course content saved successfully');
+    } catch (error) {
+      console.error('Error saving course content:', error);
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    try {
+      await saveCourseContentToDatabase(courseContent);
+      setHasUnsavedChanges(false);
+      
+      toast({
+        title: "Changes Saved",
+        description: "Your course content has been saved successfully.",
+      });
+    } catch (error) {
+      console.error('Error saving changes:', error);
+      toast({
+        title: "Save Failed",
+        description: "Failed to save changes. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
   if (loading) {
     return (
       <div className="flex h-screen bg-gray-100 items-center justify-center">
@@ -691,40 +738,28 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
             </div>
             
             {/* Course Management Section */}
-            <div className="p-4 border-t border-gray-200 bg-gray-50">
-              <h4 className="font-semibold text-gray-800 mb-3">Course Management</h4>
-              <div className="space-y-2">
-                {hasUnsavedChanges && (
-                  <Button
-                    onClick={handleSaveChanges}
-                    disabled={isSaving}
-                    size="sm"
-                    className="w-full bg-green-600 hover:bg-green-700 text-white mb-2"
-                  >
-                    {isSaving ? (
-                      <>
-                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-3 w-3 mr-2" />
-                        Save Changes
-                      </>
-                    )}
-                  </Button>
-                )}
+            {hasUnsavedChanges && (
+              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                 <Button
-                  onClick={() => setShowAddTopic(true)}
+                  onClick={handleSaveChanges}
+                  disabled={isSaving}
                   size="sm"
-                  variant="outline"
-                  className="w-full flex items-center justify-center space-x-2"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
                 >
-                  <Plus className="h-4 w-4" />
-                  <span>Add New Topic</span>
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-3 w-3 mr-2" />
+                      Save Changes
+                    </>
+                  )}
                 </Button>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -782,9 +817,9 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
                 <div className="bg-gray-50">
                   {section.subsections.map((subsection, subsectionIndex) => (
                     <div key={subsection.id} className="group">
-                      <button
+                      <div
                         onClick={() => navigateToSection(sectionIndex, subsectionIndex)}
-                        className={`w-full flex items-center p-3 pl-12 text-left hover:bg-gray-100 ${
+                        className={`w-full flex items-center p-3 pl-12 text-left hover:bg-gray-100 cursor-pointer ${
                           sectionIndex === currentSectionIndex && subsectionIndex === currentSubsectionIndex
                             ? 'bg-blue-900 text-white'
                             : ''
@@ -839,7 +874,7 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
                             <Trash2 className="h-3 w-3 text-red-600" />
                           </button>
                         </div>
-                      </button>
+                      </div>
                     </div>
                   ))}
                   
@@ -857,6 +892,42 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
               )}
             </div>
           ))}
+        </div>
+        
+        {/* Course Management Section */}
+        <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <h4 className="font-semibold text-gray-800 mb-3">Course Management</h4>
+          <div className="space-y-2">
+            {hasUnsavedChanges && (
+              <Button
+                onClick={handleSaveChanges}
+                disabled={isSaving}
+                size="sm"
+                className="w-full bg-green-600 hover:bg-green-700 text-white mb-2"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-3 w-3 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            )}
+            <Button
+              onClick={() => setShowAddTopic(true)}
+              size="sm"
+              variant="outline"
+              className="w-full flex items-center justify-center space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add New Topic</span>
+            </Button>
+          </div>
         </div>
       </div>
 
