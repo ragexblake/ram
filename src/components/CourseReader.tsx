@@ -14,6 +14,7 @@ interface CourseSection {
   content: string;
   subsections?: CourseSubsection[];
   completed?: boolean;
+  hasQuiz?: boolean;
 }
 
 interface CourseSubsection {
@@ -21,6 +22,14 @@ interface CourseSubsection {
   title: string;
   content: string;
   completed?: boolean;
+  hasQuiz?: boolean;
+}
+
+interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: number;
 }
 
 const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => {
@@ -31,6 +40,9 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [currentQuizAnswers, setCurrentQuizAnswers] = useState<{ [key: string]: number }>({});
+  const [quizResults, setQuizResults] = useState<{ [key: string]: boolean }>({});
 
   // Generate course structure from course plan
   const generateCourseStructure = (): CourseSection[] => {
@@ -191,7 +203,8 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
             {
               id: '3-2',
               title: 'Success Metrics',
-              content: 'Measuring and tracking progress'
+              content: 'Measuring and tracking progress',
+              hasQuiz: true
             }
           ]
         }
@@ -281,7 +294,8 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
             {
               id: '1-2',
               title: 'Historical Context',
-              content: 'How the subject developed over time'
+              content: 'How the subject developed over time',
+              hasQuiz: true
             }
           ]
         },
@@ -375,7 +389,8 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
             {
               id: '3-2',
               title: 'Future Directions',
-              content: 'Where to go from here'
+              content: 'Where to go from here',
+              hasQuiz: true
             }
           ]
         }
@@ -384,6 +399,47 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
   };
 
   const [courseStructure] = useState<CourseSection[]>(generateCourseStructure());
+
+  // Generate quiz questions based on content
+  const generateQuizQuestions = (sectionId: string, subsectionId?: string): QuizQuestion[] => {
+    const baseQuestions: QuizQuestion[] = [
+      {
+        id: 'q1',
+        question: 'What is the main focus of this section?',
+        options: [
+          'Understanding basic concepts',
+          'Advanced implementation',
+          'Historical background',
+          'Future predictions'
+        ],
+        correctAnswer: 0
+      },
+      {
+        id: 'q2',
+        question: 'Which approach is most effective for learning?',
+        options: [
+          'Memorizing facts only',
+          'Practical application and understanding',
+          'Skipping difficult topics',
+          'Reading without practice'
+        ],
+        correctAnswer: 1
+      },
+      {
+        id: 'q3',
+        question: 'What should you do when facing challenges?',
+        options: [
+          'Give up immediately',
+          'Skip to easier topics',
+          'Take time to understand and practice',
+          'Ignore the difficulty'
+        ],
+        correctAnswer: 2
+      }
+    ];
+    
+    return baseQuestions;
+  };
 
   const toggleSection = (sectionId: string) => {
     const newExpanded = new Set(expandedSections);
@@ -398,6 +454,7 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
   const navigateToSection = (sectionIndex: number, subsectionIndex: number = 0) => {
     setCurrentSectionIndex(sectionIndex);
     setCurrentSubsectionIndex(subsectionIndex);
+    setShowQuiz(false);
     
     // Auto-expand the selected section
     const newExpanded = new Set(expandedSections);
@@ -414,9 +471,15 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
       setCurrentSectionIndex(currentSectionIndex + 1);
       setCurrentSubsectionIndex(0);
     }
+    setShowQuiz(false);
   };
 
   const navigatePrevious = () => {
+    if (showQuiz) {
+      setShowQuiz(false);
+      return;
+    }
+    
     if (currentSubsectionIndex > 0) {
       setCurrentSubsectionIndex(currentSubsectionIndex - 1);
     } else if (currentSectionIndex > 0) {
@@ -434,6 +497,13 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
       newCompleted.add(itemId);
     }
     setCompletedItems(newCompleted);
+    
+    // Update progress
+    const totalItems = courseStructure.reduce((total, section) => {
+      return total + (section.subsections ? section.subsections.length : 1);
+    }, 0);
+    const completedCount = newCompleted.size;
+    setProgress(Math.round((completedCount / totalItems) * 100));
   };
 
   const getCurrentContent = () => {
@@ -441,21 +511,201 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
     if (currentSection.subsections && currentSection.subsections[currentSubsectionIndex]) {
       return {
         title: currentSection.subsections[currentSubsectionIndex].title,
-        content: currentSection.content
+        content: currentSection.content,
+        hasQuiz: currentSection.subsections[currentSubsectionIndex].hasQuiz
       };
     }
     return {
       title: currentSection.title,
-      content: currentSection.content
+      content: currentSection.content,
+      hasQuiz: currentSection.hasQuiz
     };
+  };
+
+  const handleQuizAnswer = (questionId: string, answerIndex: number) => {
+    setCurrentQuizAnswers(prev => ({
+      ...prev,
+      [questionId]: answerIndex
+    }));
+  };
+
+  const submitQuiz = () => {
+    const questions = generateQuizQuestions(currentSectionIndex.toString(), currentSubsectionIndex.toString());
+    const results: { [key: string]: boolean } = {};
+    
+    questions.forEach(question => {
+      const userAnswer = currentQuizAnswers[question.id];
+      results[question.id] = userAnswer === question.correctAnswer;
+    });
+    
+    setQuizResults(results);
+    
+    // Mark current item as completed if quiz passed
+    const passedQuiz = Object.values(results).filter(Boolean).length >= Math.ceil(questions.length * 0.7);
+    if (passedQuiz) {
+      const currentSection = courseStructure[currentSectionIndex];
+      const itemId = currentSection.subsections 
+        ? currentSection.subsections[currentSubsectionIndex].id
+        : currentSection.id;
+      markAsCompleted(itemId);
+    }
   };
 
   const currentContent = getCurrentContent();
 
-  const canNavigatePrevious = currentSectionIndex > 0 || currentSubsectionIndex > 0;
+  const canNavigatePrevious = currentSectionIndex > 0 || currentSubsectionIndex > 0 || showQuiz;
   const canNavigateNext = currentSectionIndex < courseStructure.length - 1 || 
     (courseStructure[currentSectionIndex].subsections && 
      currentSubsectionIndex < courseStructure[currentSectionIndex].subsections.length - 1);
+
+  if (showQuiz) {
+    const questions = generateQuizQuestions(currentSectionIndex.toString(), currentSubsectionIndex.toString());
+    const hasResults = Object.keys(quizResults).length > 0;
+    
+    return (
+      <div className="flex h-screen bg-gray-100">
+        {/* Sidebar Navigation */}
+        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+          <div className="p-4 border-b border-gray-200">
+            <button
+              onClick={onBack}
+              className="flex items-center text-gray-600 hover:text-gray-800 mb-3"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Course landing page
+            </button>
+            <h2 className="font-semibold text-gray-900 text-sm">{course.course_title}</h2>
+            <div className="mt-2 bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">{progress}%</p>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-semibold text-blue-900 mb-2">Quiz in Progress</h3>
+              <p className="text-sm text-blue-700">
+                {currentContent.title} - Knowledge Check
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Quiz Content */}
+        <div className="flex-1 flex flex-col">
+          <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
+            <div className="max-w-4xl mx-auto">
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 min-h-[600px]">
+                <div className="p-8">
+                  <h1 className="text-2xl font-bold text-gray-900 mb-6">
+                    Knowledge Check: {currentContent.title}
+                  </h1>
+                  
+                  {!hasResults ? (
+                    <div className="space-y-6">
+                      {questions.map((question, index) => (
+                        <div key={question.id} className="border-b border-gray-200 pb-6 last:border-b-0">
+                          <h3 className="text-lg font-medium text-gray-900 mb-4">
+                            {index + 1}. {question.question}
+                          </h3>
+                          <div className="space-y-2">
+                            {question.options.map((option, optionIndex) => (
+                              <label key={optionIndex} className="flex items-center space-x-3 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={question.id}
+                                  value={optionIndex}
+                                  checked={currentQuizAnswers[question.id] === optionIndex}
+                                  onChange={() => handleQuizAnswer(question.id, optionIndex)}
+                                  className="w-4 h-4 text-blue-600"
+                                />
+                                <span className="text-gray-700">{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <div className="pt-6">
+                        <Button
+                          onClick={submitQuiz}
+                          disabled={Object.keys(currentQuizAnswers).length < questions.length}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          Submit Quiz
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <h3 className="text-lg font-semibold text-green-800 mb-2">Quiz Results</h3>
+                        <p className="text-green-700">
+                          You scored {Object.values(quizResults).filter(Boolean).length} out of {questions.length}
+                        </p>
+                      </div>
+                      
+                      {questions.map((question, index) => {
+                        const userAnswer = currentQuizAnswers[question.id];
+                        const isCorrect = quizResults[question.id];
+                        
+                        return (
+                          <div key={question.id} className="border-b border-gray-200 pb-6 last:border-b-0">
+                            <h3 className="text-lg font-medium text-gray-900 mb-4">
+                              {index + 1}. {question.question}
+                            </h3>
+                            <div className="space-y-2">
+                              {question.options.map((option, optionIndex) => {
+                                const isUserAnswer = userAnswer === optionIndex;
+                                const isCorrectAnswer = optionIndex === question.correctAnswer;
+                                
+                                let className = "flex items-center space-x-3 p-2 rounded";
+                                if (isCorrectAnswer) {
+                                  className += " bg-green-100 border border-green-300";
+                                } else if (isUserAnswer && !isCorrect) {
+                                  className += " bg-red-100 border border-red-300";
+                                }
+                                
+                                return (
+                                  <div key={optionIndex} className={className}>
+                                    <div className="w-4 h-4 flex items-center justify-center">
+                                      {isCorrectAnswer && <CheckCircle className="h-4 w-4 text-green-600" />}
+                                      {isUserAnswer && !isCorrect && <Circle className="h-4 w-4 text-red-600" />}
+                                    </div>
+                                    <span className="text-gray-700">{option}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      <div className="pt-6">
+                        <Button
+                          onClick={() => {
+                            setShowQuiz(false);
+                            setCurrentQuizAnswers({});
+                            setQuizResults({});
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          Continue Learning
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -537,6 +787,11 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
                       }`}>
                         {subsection.title}
                       </span>
+                      {subsection.hasQuiz && (
+                        <span className="ml-auto text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                          Quiz
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -593,6 +848,22 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
                   className="prose prose-lg max-w-none"
                   dangerouslySetInnerHTML={{ __html: currentContent.content }}
                 />
+                
+                {/* Quiz Button */}
+                {currentContent.hasQuiz && (
+                  <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <h3 className="font-semibold text-yellow-800 mb-2">Knowledge Check Available</h3>
+                    <p className="text-yellow-700 text-sm mb-4">
+                      Test your understanding of this section with a quick quiz.
+                    </p>
+                    <Button
+                      onClick={() => setShowQuiz(true)}
+                      className="bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      Take Quiz
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
 
