@@ -7,6 +7,7 @@ import AssignedCoursesSection from './courses/AssignedCoursesSection';
 interface CoursesViewProps {
   user: any;
   onStartSession: (course: any) => void;
+  onReadCourse?: (course: any) => void;
 }
 
 const CoursesView: React.FC<CoursesViewProps> = ({ user, onStartSession, onReadCourse }) => {
@@ -245,6 +246,7 @@ const CoursesView: React.FC<CoursesViewProps> = ({ user, onStartSession, onReadC
             getCourseProgress={getCourseProgress}
             getCourseStatus={getCourseStatus}
             showAdminActions={false}
+            onReadCourse={onReadCourse}
           />
         </div>
       )}
