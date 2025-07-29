@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Play, CheckCircle, Clock, TestTube, Users, Crown } from 'lucide-react';
+import { Play, CheckCircle, Clock, TestTube, Users, Crown, BookOpen } from 'lucide-react';
 
 interface CourseCardProps {
   course: any;
@@ -13,6 +13,7 @@ interface CourseCardProps {
   hoveredAssign?: string | null;
   onAssignHover?: (courseId: string | null) => void;
   showAdminActions?: boolean;
+  onReadCourse?: (course: any) => void;
 }
 
 const CourseCard: React.FC<CourseCardProps> = ({
@@ -26,6 +27,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
   hoveredAssign,
   onAssignHover,
   showAdminActions = true
+  onReadCourse
 }) => {
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -93,19 +95,30 @@ const CourseCard: React.FC<CourseCardProps> = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-600">{getStatusText(status)}</span>
-          <button
-            onClick={() => onStartSession(course)}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
-              status === 'completed' 
-                ? 'bg-blue-500 hover:bg-blue-600' 
-                : status === 'in-progress'
-                  ? 'bg-orange-500 hover:bg-orange-600'
-                  : 'bg-green-500 hover:bg-green-600'
-            } text-white`}
-          >
-            <Play className="h-4 w-4" />
-            <span>{getButtonText(status)}</span>
-          </button>
+          <div className="flex space-x-2">
+            {onReadCourse && (
+              <button
+                onClick={() => onReadCourse(course)}
+                className="flex items-center space-x-1 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
+              >
+                <BookOpen className="h-4 w-4" />
+                <span>Read</span>
+              </button>
+            )}
+            <button
+              onClick={() => onStartSession(course)}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
+                status === 'completed' 
+                  ? 'bg-blue-500 hover:bg-blue-600' 
+                  : status === 'in-progress'
+                    ? 'bg-orange-500 hover:bg-orange-600'
+                    : 'bg-green-500 hover:bg-green-600'
+              } text-white`}
+            >
+              <Play className="h-4 w-4" />
+              <span>{getButtonText(status)}</span>
+            </button>
+          </div>
         </div>
         
         {showAdminActions && user.role === 'Admin' && onTestCourse && onAssignCourse && (

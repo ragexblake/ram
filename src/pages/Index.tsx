@@ -130,6 +130,7 @@ const IndexContent: React.FC = () => {
         onCourseCreated={handleCourseCreated}
         currentSession={currentSession}
         onSessionPerformanceComplete={handleSessionPerformanceComplete}
+        onReadCourse={handleReadCourse}
       />
     </MainLayout>
   );

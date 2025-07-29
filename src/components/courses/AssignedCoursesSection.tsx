@@ -17,6 +17,7 @@ interface AssignedCoursesSectionProps {
   getCourseProgress: (courseId: string) => any;
   getCourseStatus: (courseId: string) => string;
   showAdminActions?: boolean;
+  onReadCourse?: (course: any) => void;
 }
 
 const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({
@@ -32,6 +33,7 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({
   getCourseProgress,
   getCourseStatus,
   showAdminActions = false
+  onReadCourse
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -127,6 +129,7 @@ const AssignedCoursesSection: React.FC<AssignedCoursesSectionProps> = ({
                       hoveredAssign={hoveredAssign}
                       onAssignHover={onAssignHover}
                       showAdminActions={showAdminActions}
+                      onReadCourse={onReadCourse}
                     />
                   );
                 })}

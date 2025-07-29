@@ -12,6 +12,7 @@ import PricingPage from '@/components/PricingPage';
 import AccountSettings from '@/components/AccountSettings';
 import Profile from '@/components/Profile';
 import HonestBox from '@/components/HonestBox';
+import CourseReader from '@/components/CourseReader';
 
 interface ContentRendererProps {
   activeTab: string;
@@ -21,6 +22,12 @@ interface ContentRendererProps {
   onCourseCreated: () => void;
   currentSession: any;
   onSessionPerformanceComplete: () => void;
+  onReadCourse?: (course: any) => void;
+  courseReaderData?: {
+    course: any;
+    isReading: boolean;
+  };
+  onExitCourseReader?: () => void;
 }
 
 const ContentRenderer: React.FC<ContentRendererProps> = ({
@@ -31,7 +38,21 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   onCourseCreated,
   currentSession,
   onSessionPerformanceComplete
+  onReadCourse,
+  courseReaderData,
+  onExitCourseReader
 }) => {
+  // If in course reading mode, show the course reader
+  if (courseReaderData?.isReading && courseReaderData.course) {
+    return (
+      <CourseReader
+        course={courseReaderData.course}
+        user={profile}
+        onBack={onExitCourseReader || (() => {})}
+      />
+    );
+  }
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':

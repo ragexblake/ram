@@ -9,7 +9,7 @@ interface CoursesViewProps {
   onStartSession: (course: any) => void;
 }
 
-const CoursesView: React.FC<CoursesViewProps> = ({ user, onStartSession }) => {
+const CoursesView: React.FC<CoursesViewProps> = ({ user, onStartSession, onReadCourse }) => {
   const [assignedCourses, setAssignedCourses] = useState<any[]>([]);
   const [performance, setPerformance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
