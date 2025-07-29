@@ -141,7 +141,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .from('subscribers')
           .select('licenses_purchased')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
         
         if (subscriber) {
           setLicenseCount(subscriber.licenses_purchased);
