@@ -1,0 +1,882 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, CheckCircle, XCircle, Users } from 'lucide-react';
+import { Turnstile } from '@marsidev/react-turnstile';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+
+interface InvitationData {
+  id: string;
+  inviter_email: string;
+  invitee_email: string;
+  role: string;
+  status: string;
+  expires_at: string;
+  group_id: string;
+  inviter_id: string;
+  magic_link_token: string;
+}
+
+const AcceptInvitation: React.FC = () => {
+  const { token } = useParams<{ token: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  const [loading, setLoading] = useState(true);
+  const [invitation, setInvitation] = useState<InvitationData | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [showLoginForm, setShowLoginForm] = useState(false);
+  
+  // Form states for new user signup
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [password, setPassword] = useState('');
+  
+  // Login states for existing users
+  const [loginPassword, setLoginPassword] = useState('');
+  
+  // CAPTCHA state
+  const [captchaToken, setCaptchaToken] = useState<string>('');
+  
+  // Email verification states
+  const [showOTP, setShowOTP] = useState(false);
+  const [otp, setOtp] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [pendingUserData, setPendingUserData] = useState<any>(null);
+
+  useEffect(() => {
+    const validateInvitation = async () => {
+      if (!token) {
+        setError('Invalid invitation link - no token provided');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        console.log('Validating invitation with token:', token);
+        
+        // Check current user session
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log('Current user session:', user?.email || 'No user');
+        setCurrentUser(user);
+
+        // Validate invitation token with detailed logging
+        console.log('Querying invitations table with token:', token);
+        const { data: inviteData, error: inviteError } = await supabase
+          .from('invitations')
+          .select('*')
+          .eq('magic_link_token', token)
+          .eq('status', 'pending')
+          .single();
+
+        console.log('Invitation query result:', { inviteData, inviteError });
+
+        if (inviteError || !inviteData) {
+          console.error('Invitation validation failed:', inviteError);
+          
+          // Check if invitation exists but is already accepted
+          const { data: existingInvite } = await supabase
+            .from('invitations')
+            .select('*')
+            .eq('magic_link_token', token)
+            .single();
+          
+          if (existingInvite && existingInvite.status === 'accepted') {
+            setError('This invitation has already been accepted. You may already be part of the group.');
+          } else {
+            setError('This invitation is invalid or has already been used.');
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Check if invitation has expired
+        if (new Date(inviteData.expires_at) < new Date()) {
+          console.log('Invitation expired:', inviteData.expires_at);
+          setError('This invitation has expired. Please request a new one.');
+          setLoading(false);
+          return;
+        }
+
+        console.log('Valid invitation found:', inviteData);
+        setInvitation(inviteData);
+        setLoading(false);
+
+      } catch (error: any) {
+        console.error('Error validating invitation:', error);
+        setError('Failed to validate invitation. Please try again.');
+        setLoading(false);
+      }
+    };
+
+    validateInvitation();
+  }, [token]);
+
+  const markInvitationAsAccepted = async (invitationData: InvitationData) => {
+    console.log('=== MARKING INVITATION AS ACCEPTED ===');
+    console.log('Invitation data:', invitationData);
+    
+    try {
+      // Enhanced approach with better error handling
+      const { data: updateResult, error: updateError } = await supabase
+        .from('invitations')
+        .update({ 
+          status: 'accepted', 
+          accepted_at: new Date().toISOString() 
+        })
+        .eq('magic_link_token', invitationData.magic_link_token)
+        .eq('status', 'pending') // Only update if still pending
+        .select()
+        .single();
+
+      console.log('Update result:', { updateResult, updateError });
+
+      if (updateError) {
+        console.error('Error updating invitation status:', updateError);
+        // Continue anyway - the user joining the group is more important than the invitation status
+      } else {
+        console.log('Successfully updated invitation status');
+      }
+
+      return updateResult;
+      
+    } catch (error: any) {
+      console.error('Error in markInvitationAsAccepted:', error);
+      // Don't throw - let the process continue
+      return null;
+    }
+  };
+
+  // Profile creation with retry logic
+  const waitForProfileCreation = async (userId: string, maxAttempts = 10, delay = 1000) => {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(`Attempt ${attempt}/${maxAttempts}: Checking for profile creation...`);
+      
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        
+        if (profile && !profileError) {
+          console.log('✅ Profile found:', profile);
+          return profile;
+        }
+        
+        if (attempt < maxAttempts) {
+          console.log(`Profile not found yet, waiting ${delay}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay = Math.min(delay * 1.5, 5000); // Exponential backoff, max 5s
+        }
+      } catch (error) {
+        console.log(`Attempt ${attempt} failed:`, error);
+        if (attempt < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    throw new Error('Profile creation timeout - please try refreshing the page or contact support');
+  };
+
+  const ensureUserInGroup = async (userId: string, groupId: string, role: string) => {
+    console.log('=== ENSURING USER IS IN GROUP ===');
+    console.log('User ID:', userId, 'Group ID:', groupId, 'Role:', role);
+    
+    try {
+      // Wait for profile to be created by the database trigger
+      const currentProfile = await waitForProfileCreation(userId);
+      
+      if (currentProfile.group_id === groupId) {
+        console.log('✅ User already in correct group');
+        return true;
+      }
+      
+      // Update the user's group
+      console.log('🔄 Updating user group membership...');
+      const { data: updatedProfile, error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          group_id: groupId,
+          role: role as any,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error('Error updating profile:', updateError);
+        throw new Error(`Failed to join group: ${updateError.message}`);
+      }
+      
+      console.log('✅ Successfully updated profile:', updatedProfile);
+      return true;
+      
+    } catch (error: any) {
+      console.error('Error in ensureUserInGroup:', error);
+      throw error;
+    }
+  };
+
+  // OTP verification functions
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingUserData) return;
+
+    setOtpLoading(true);
+    console.log('=== VERIFYING OTP ===');
+
+    try {
+      console.log('Verifying OTP for email:', invitation?.invitee_email);
+      
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: invitation!.invitee_email,
+        token: otp,
+        type: 'signup'
+      });
+
+      if (error) {
+        console.error('OTP verification error:', error);
+        throw error;
+      }
+
+      console.log('OTP verification successful:', data);
+      
+      // Now complete the group joining process
+      console.log('=== COMPLETING GROUP JOIN AFTER EMAIL VERIFICATION ===');
+      
+      await ensureUserInGroup(pendingUserData.userId, pendingUserData.groupId, pendingUserData.role);
+      await markInvitationAsAccepted(pendingUserData.invitation);
+
+      console.log('=== INVITATION ACCEPTANCE COMPLETED SUCCESSFULLY ===');
+
+      toast({
+        title: "Welcome to the team!",
+        description: "Your account has been verified and you've joined the group successfully.",
+      });
+
+      // Redirect to dashboard
+      setTimeout(() => {
+        navigate('/?tab=dashboard');
+      }, 1000);
+
+    } catch (error: any) {
+      console.error('OTP verification error:', error);
+      let errorMessage = error.message;
+      
+      if (error.message?.includes('Token has expired')) {
+        errorMessage = 'Verification code has expired. Please request a new one.';
+      } else if (error.message?.includes('Invalid token')) {
+        errorMessage = 'Invalid verification code. Please check and try again.';
+      }
+      
+      toast({
+        title: "Verification Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (!invitation) return;
+    
+    setProcessing(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: invitation.invitee_email,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Code resent!",
+        description: "A new verification code has been sent to your email.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to resend verification code.",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleNewUserSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!invitation) return;
+    
+    // Validate CAPTCHA
+    if (!captchaToken) {
+      toast({
+        title: "CAPTCHA Required",
+        description: "Please complete the CAPTCHA verification.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setProcessing(true);
+    console.log('=== STARTING NEW USER SIGNUP ===');
+
+    try {
+      // Step 1: Create new user account
+      console.log('Step 1: Creating user account for:', invitation.invitee_email);
+      const { data: authData, error: signupError } = await supabase.auth.signUp({
+        email: invitation.invitee_email,
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            full_name: `${firstName} ${lastName}`,
+            role: invitation.role,
+          },
+          captchaToken,
+          emailRedirectTo: window.location.origin,
+        }
+      });
+
+      if (signupError) {
+        if (signupError.message?.includes('User already registered')) {
+          setShowLoginForm(true);
+          toast({
+            title: "Account Already Exists",
+            description: "An account with this email already exists. Please login below.",
+            variant: "destructive",
+          });
+          setProcessing(false);
+          return;
+        }
+        throw signupError;
+      }
+
+      if (!authData.user) {
+        throw new Error('User creation failed');
+      }
+
+      console.log('Step 1 SUCCESS - User created, showing OTP verification:', authData.user.id);
+      
+      // Store pending user data for after OTP verification
+      setPendingUserData({
+        userId: authData.user.id,
+        groupId: invitation.group_id,
+        role: invitation.role,
+        invitation: invitation
+      });
+
+      // Show OTP verification screen
+      setShowOTP(true);
+      toast({
+        title: "Verification code sent!",
+        description: "Please check your email for a 6-digit verification code.",
+      });
+
+    } catch (error: any) {
+      console.error('=== SIGNUP PROCESS FAILED ===', error);
+      toast({
+        title: "Signup Error",
+        description: error.message || "Failed to create account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleExistingUserLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!invitation) return;
+    
+    // Validate CAPTCHA
+    if (!captchaToken) {
+      toast({
+        title: "CAPTCHA Required",
+        description: "Please complete the CAPTCHA verification.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setProcessing(true);
+    console.log('=== STARTING EXISTING USER LOGIN ===');
+
+    try {
+      // Step 1: Log in existing user
+      console.log('Step 1: Logging in user:', invitation.invitee_email);
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+        email: invitation.invitee_email,
+        password: loginPassword,
+        options: {
+          captchaToken
+        }
+      });
+
+      if (loginError) {
+        throw loginError;
+      }
+
+      if (!loginData.user) {
+        throw new Error('Login failed');
+      }
+
+      console.log('Step 1 SUCCESS - User logged in:', loginData.user.id);
+
+      // Step 2: Ensure user is in the correct group
+      console.log('Step 2: Ensuring group membership...');
+      await ensureUserInGroup(loginData.user.id, invitation.group_id, invitation.role);
+
+      // Step 3: Mark invitation as accepted
+      console.log('Step 3: Marking invitation as accepted...');
+      await markInvitationAsAccepted(invitation);
+
+      console.log('=== LOGIN PROCESS COMPLETED SUCCESSFULLY ===');
+
+      toast({
+        title: "Successfully joined!",
+        description: "You've been added to the group and can now access shared resources.",
+      });
+
+      // Redirect to dashboard with a small delay
+      setTimeout(() => {
+        navigate('/?tab=dashboard');
+      }, 1000);
+
+    } catch (error: any) {
+      console.error('=== LOGIN PROCESS FAILED ===', error);
+      let errorMessage = error.message;
+      
+      if (error.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid password. Please check your password and try again.';
+      }
+      
+      toast({
+        title: "Login Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleJoinGroup = async () => {
+    if (!invitation || !currentUser) return;
+    
+    setProcessing(true);
+    console.log('=== STARTING JOIN GROUP FOR LOGGED-IN USER ===');
+
+    try {
+      // Step 1: Ensure user is in the correct group
+      console.log('Step 1: Ensuring group membership...');
+      await ensureUserInGroup(currentUser.id, invitation.group_id, invitation.role);
+
+      // Step 2: Mark invitation as accepted
+      console.log('Step 2: Marking invitation as accepted...');
+      await markInvitationAsAccepted(invitation);
+
+      console.log('=== JOIN GROUP PROCESS COMPLETED SUCCESSFULLY ===');
+
+      toast({
+        title: "Successfully joined!",
+        description: "You've been added to the group and can now access shared resources.",
+      });
+
+      // Redirect to dashboard with a small delay
+      setTimeout(() => {
+        navigate('/?tab=dashboard');
+      }, 1000);
+
+    } catch (error: any) {
+      console.error('=== JOIN GROUP PROCESS FAILED ===', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to join the group. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-green-500 mx-auto mb-4" />
+          <div className="text-gray-600">Validating invitation...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Invalid Invitation</h1>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button
+            onClick={() => navigate('/')}
+            className="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 transition-colors"
+          >
+            Go to ONEGO Learning
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!invitation) {
+    return null;
+  }
+
+  // Show OTP verification screen after signup
+  if (showOTP) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+          <div className="text-center mb-8">
+            <img 
+              src="https://onego.ai/wp-content/uploads/2025/01/ONEGO-Logo-e1737199296102.png" 
+              alt="ONEGO Learning" 
+              className="h-16 mx-auto mb-4"
+            />
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Verify Your Email</h1>
+            <p className="text-gray-600">
+              We've sent a 6-digit verification code to<br />
+              <strong>{invitation.invitee_email}</strong>
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              After verification, you'll automatically join the group.
+            </p>
+          </div>
+
+          <form onSubmit={handleVerifyOTP} className="space-y-6">
+            <div className="flex justify-center">
+              <InputOTP
+                maxLength={6}
+                value={otp}
+                onChange={(value) => setOtp(value)}
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+
+            <button
+              type="submit"
+              disabled={otpLoading || otp.length !== 6}
+              className="w-full bg-green-500 text-white py-3 px-4 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 font-semibold flex items-center justify-center"
+            >
+              {otpLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Verifying & Joining Group...
+                </>
+              ) : (
+                'Verify & Join Group'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-gray-600 mb-4">
+              Didn't receive the code?
+            </p>
+            <button
+              onClick={handleResendOTP}
+              disabled={processing}
+              className="text-green-500 hover:text-green-600 font-medium disabled:opacity-50"
+            >
+              {processing ? 'Sending...' : 'Resend Code'}
+            </button>
+          </div>
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => {
+                setShowOTP(false);
+                setOtp('');
+                setPendingUserData(null);
+              }}
+              className="text-gray-500 hover:text-gray-600 font-medium"
+            >
+              ← Back to signup
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is already logged in and it's the same email as the invitation
+  if (currentUser && currentUser.email === invitation.invitee_email) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+          <div className="text-center mb-6">
+            <img 
+              src="https://onego.ai/wp-content/uploads/2025/01/ONEGO-Logo-e1737199296102.png" 
+              alt="ONEGO Learning" 
+              className="h-16 mx-auto mb-4"
+            />
+            <Users className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Join Group Invitation</h1>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <p className="text-green-800 text-center">
+              <strong>{invitation.inviter_email}</strong> has invited you to join their group as a <strong>{invitation.role}</strong>.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <button
+              onClick={handleJoinGroup}
+              disabled={processing}
+              className="w-full bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 disabled:opacity-50 font-semibold flex items-center justify-center"
+            >
+              {processing ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CheckCircle className="h-4 w-4 mr-2" />
+              )}
+              {processing ? 'Joining...' : 'Accept & Join Group'}
+            </button>
+
+            <button
+              onClick={() => navigate('/')}
+              className="w-full text-gray-600 hover:text-gray-800 py-2"
+            >
+              Maybe later
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show appropriate form based on whether user is logged in or if we need to show login form
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+        <div className="text-center mb-8">
+          <img 
+            src="https://onego.ai/wp-content/uploads/2025/01/ONEGO-Logo-e1737199296102.png" 
+            alt="ONEGO Learning" 
+            className="h-16 mx-auto mb-4"
+          />
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">You're Invited!</h1>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <p className="text-green-800 text-sm">
+              <strong>{invitation.inviter_email}</strong> has invited you to join their team as a <strong>{invitation.role}</strong>
+            </p>
+          </div>
+        </div>
+
+        {showLoginForm ? (
+          // Show login form for existing users
+          <form onSubmit={handleExistingUserLogin} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={invitation.invitee_email}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+                minLength={6}
+              />
+            </div>
+
+            <div className="flex justify-center">
+              <Turnstile
+                siteKey="0x4AAAAAABkelv713e06-flZ"
+                onSuccess={(token) => {
+                  console.log('CAPTCHA completed successfully for login');
+                  setCaptchaToken(token);
+                }}
+                onError={(error) => {
+                  console.error('CAPTCHA error:', error);
+                  setCaptchaToken('');
+                  toast({
+                    title: "CAPTCHA Error",
+                    description: "Failed to load CAPTCHA. Please refresh the page.",
+                    variant: "destructive",
+                  });
+                }}
+                onExpire={() => {
+                  console.log('CAPTCHA expired, clearing token');
+                  setCaptchaToken('');
+                  toast({
+                    title: "CAPTCHA Expired",
+                    description: "Please complete the CAPTCHA again.",
+                    variant: "destructive",
+                  });
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={processing || !captchaToken}
+              className="w-full bg-green-500 text-white py-3 px-4 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 font-semibold"
+            >
+              {processing ? 'Joining...' : 'Login & Join Group'}
+            </button>
+
+            <div className="text-center text-sm text-gray-600">
+              Don't have an account?{' '}
+              <button
+                type="button"
+                onClick={() => setShowLoginForm(false)}
+                className="text-green-500 hover:text-green-600 font-medium"
+              >
+                Create one instead
+              </button>
+            </div>
+          </form>
+        ) : (
+          // Show signup form for new users
+          <form onSubmit={handleNewUserSignup} className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={invitation.invitee_email}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Create Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+                minLength={6}
+              />
+            </div>
+
+            <div className="flex justify-center">
+              <Turnstile
+                siteKey="0x4AAAAAABkelv713e06-flZ"
+                onSuccess={(token) => {
+                  console.log('CAPTCHA completed successfully for signup');
+                  setCaptchaToken(token);
+                }}
+                onError={(error) => {
+                  console.error('CAPTCHA error:', error);
+                  setCaptchaToken('');
+                  toast({
+                    title: "CAPTCHA Error",
+                    description: "Failed to load CAPTCHA. Please refresh the page.",
+                    variant: "destructive",
+                  });
+                }}
+                onExpire={() => {
+                  console.log('CAPTCHA expired, clearing token');
+                  setCaptchaToken('');
+                  toast({
+                    title: "CAPTCHA Expired",
+                    description: "Please complete the CAPTCHA again.",
+                    variant: "destructive",
+                  });
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={processing || !captchaToken}
+              className="w-full bg-green-500 text-white py-3 px-4 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 font-semibold"
+            >
+              {processing ? 'Creating Account...' : 'Create Account & Join'}
+            </button>
+
+            <div className="text-center text-sm text-gray-600">
+              Already have an account with this email?{' '}
+              <button
+                type="button"
+                onClick={() => setShowLoginForm(true)}
+                className="text-green-500 hover:text-green-600 font-medium"
+              >
+                Click here to login
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default AcceptInvitation;
