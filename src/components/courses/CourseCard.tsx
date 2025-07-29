@@ -26,7 +26,7 @@ const CourseCard: React.FC<CourseCardProps> = ({
   onAssignCourse,
   hoveredAssign,
   onAssignHover,
-  showAdminActions = true
+  showAdminActions = true,
   onReadCourse
 }) => {
   const getStatusIcon = (status: string) => {
