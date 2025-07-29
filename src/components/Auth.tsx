@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { Turnstile } from '@marsidev/react-turnstile';
 
 interface AuthProps {
   onAuthSuccess: () => void;
@@ -19,7 +18,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
   const [showOTP, setShowOTP] = useState(false);
   const [otp, setOtp] = useState('');
   const [otpLoading, setOtpLoading] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState<string>('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -79,17 +77,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
     try {
       if (isSignUp) {
-        // Validate CAPTCHA token for signup
-        if (!captchaToken) {
-          toast({
-            title: "CAPTCHA Required",
-            description: "Please complete the CAPTCHA verification.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-
         console.log('Starting email signup with OTP...');
         
         const { data: authData, error } = await supabase.auth.signUp({
@@ -102,7 +89,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
               full_name: `${firstName} ${lastName}`,
               company_name: companyName,
             },
-            captchaToken
           }
         });
 
@@ -118,25 +104,11 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           description: "Please check your email for a 6-digit verification code.",
         });
       } else {
-        // Validate CAPTCHA token for signin
-        if (!captchaToken) {
-          toast({
-            title: "CAPTCHA Required",
-            description: "Please complete the CAPTCHA verification.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
-
         console.log('Starting email signin...');
         
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
-          options: {
-            captchaToken
-          }
         });
 
         if (error) {
@@ -323,37 +295,9 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
           />
           <h1 className="text-3xl font-bold text-gray-900 mb-2">ONEGO Learning</h1>
           <p className="text-gray-600">AI-Powered Training Platform</p>
-        </div>
-
-        <form onSubmit={handleAuth} className="space-y-6">
-          {isSignUp && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                    required
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                    required
-                  />
-                </div>
-              </div>
+          disabled={loading}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Company Name

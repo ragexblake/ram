@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, XCircle, Users } from 'lucide-react';
-import { Turnstile } from '@marsidev/react-turnstile';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 interface InvitationData {
@@ -37,9 +36,6 @@ const AcceptInvitation: React.FC = () => {
   
   // Login states for existing users
   const [loginPassword, setLoginPassword] = useState('');
-  
-  // CAPTCHA state
-  const [captchaToken, setCaptchaToken] = useState<string>('');
   
   // Email verification states
   const [showOTP, setShowOTP] = useState(false);
@@ -317,16 +313,6 @@ const AcceptInvitation: React.FC = () => {
     
     if (!invitation) return;
     
-    // Validate CAPTCHA
-    if (!captchaToken) {
-      toast({
-        title: "CAPTCHA Required",
-        description: "Please complete the CAPTCHA verification.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     setProcessing(true);
     console.log('=== STARTING NEW USER SIGNUP ===');
 
@@ -343,7 +329,6 @@ const AcceptInvitation: React.FC = () => {
             full_name: `${firstName} ${lastName}`,
             role: invitation.role,
           },
-          captchaToken,
         }
       });
 
@@ -399,16 +384,6 @@ const AcceptInvitation: React.FC = () => {
     
     if (!invitation) return;
     
-    // Validate CAPTCHA
-    if (!captchaToken) {
-      toast({
-        title: "CAPTCHA Required",
-        description: "Please complete the CAPTCHA verification.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     setProcessing(true);
     console.log('=== STARTING EXISTING USER LOGIN ===');
 
@@ -418,9 +393,6 @@ const AcceptInvitation: React.FC = () => {
       const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
         email: invitation.invitee_email,
         password: loginPassword,
-        options: {
-          captchaToken
-        }
       });
 
       if (loginError) {
@@ -722,37 +694,9 @@ const AcceptInvitation: React.FC = () => {
               />
             </div>
 
-            <div className="flex justify-center">
-              <Turnstile
-                siteKey="0x4AAAAAABkelv713e06-flZ"
-                onSuccess={(token) => {
-                  console.log('CAPTCHA completed successfully for login');
-                  setCaptchaToken(token);
-                }}
-                onError={(error) => {
-                  console.error('CAPTCHA error:', error);
-                  setCaptchaToken('');
-                  toast({
-                    title: "CAPTCHA Error",
-                    description: "Failed to load CAPTCHA. Please refresh the page.",
-                    variant: "destructive",
-                  });
-                }}
-                onExpire={() => {
-                  console.log('CAPTCHA expired, clearing token');
-                  setCaptchaToken('');
-                  toast({
-                    title: "CAPTCHA Expired",
-                    description: "Please complete the CAPTCHA again.",
-                    variant: "destructive",
-                  });
-                }}
-              />
-            </div>
-
             <button
               type="submit"
-              disabled={processing || !captchaToken}
+              disabled={processing}
               className="w-full bg-green-500 text-white py-3 px-4 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 font-semibold"
             >
               {processing ? 'Joining...' : 'Login & Join Group'}
@@ -825,37 +769,9 @@ const AcceptInvitation: React.FC = () => {
               />
             </div>
 
-            <div className="flex justify-center">
-              <Turnstile
-                siteKey="0x4AAAAAABkelv713e06-flZ"
-                onSuccess={(token) => {
-                  console.log('CAPTCHA completed successfully for signup');
-                  setCaptchaToken(token);
-                }}
-                onError={(error) => {
-                  console.error('CAPTCHA error:', error);
-                  setCaptchaToken('');
-                  toast({
-                    title: "CAPTCHA Error",
-                    description: "Failed to load CAPTCHA. Please refresh the page.",
-                    variant: "destructive",
-                  });
-                }}
-                onExpire={() => {
-                  console.log('CAPTCHA expired, clearing token');
-                  setCaptchaToken('');
-                  toast({
-                    title: "CAPTCHA Expired",
-                    description: "Please complete the CAPTCHA again.",
-                    variant: "destructive",
-                  });
-                }}
-              />
-            </div>
-
             <button
               type="submit"
-              disabled={processing || !captchaToken}
+              disabled={processing}
               className="w-full bg-green-500 text-white py-3 px-4 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 font-semibold"
             >
               {processing ? 'Creating Account...' : 'Create Account & Join'}
