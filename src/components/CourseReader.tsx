@@ -546,6 +546,26 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
             <div className="p-4 border-t border-gray-200 bg-gray-50">
               <h4 className="font-semibold text-gray-800 mb-3">Course Management</h4>
               <div className="space-y-2">
+                {hasUnsavedChanges && (
+                  <Button
+                    onClick={handleSaveChanges}
+                    disabled={isSaving}
+                    size="sm"
+                    className="w-full bg-green-600 hover:bg-green-700 text-white mb-2"
+                  >
+                    {isSaving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-3 w-3 mr-2" />
+                        Save Changes
+                      </>
+                    )}
+                  </Button>
+                )}
                 <Button
                   onClick={() => setShowAddTopic(true)}
                   size="sm"
