@@ -53,6 +53,8 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
   const [showAddTopic, setShowAddTopic] = useState(false);
   const [newTopicTitle, setNewTopicTitle] = useState('');
   const [newTopicContent, setNewTopicContent] = useState('');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
