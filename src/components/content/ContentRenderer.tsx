@@ -49,6 +49,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
         course={courseReaderData.course}
         user={profile}
         onBack={onExitCourseReader || (() => {})}
+        readOnly={activeTab === 'my-courses'}
       />
     );
   }

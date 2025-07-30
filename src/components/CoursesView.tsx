@@ -216,6 +216,7 @@ const CoursesView: React.FC<CoursesViewProps> = ({ user, onStartSession, onReadC
             getCourseProgress={getCourseProgress}
             getCourseStatus={getCourseStatus}
             showAdminActions={false}
+            onReadCourse={onReadCourse}
           />
           
           <AssignedCoursesSection
@@ -231,6 +232,7 @@ const CoursesView: React.FC<CoursesViewProps> = ({ user, onStartSession, onReadC
             getCourseProgress={getCourseProgress}
             getCourseStatus={getCourseStatus}
             showAdminActions={false}
+            onReadCourse={onReadCourse}
           />
           
           <AssignedCoursesSection
