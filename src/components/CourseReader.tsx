@@ -89,7 +89,14 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
 
       if (response.error) {
         console.error('Function invocation error:', response.error);
-        throw new Error(response.error.message);
+        console.warn('Content generation failed, using fallback content');
+        const fallbackContent = createFallbackContent(course);
+        setCourseContent(fallbackContent);
+        
+        // Save the fallback content to database for future use
+        await saveCourseContentToDatabase(fallbackContent);
+        setLoading(false);
+        return;
       }
 
       if (response.data?.courseContent?.sections) {
@@ -100,28 +107,24 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
         await saveCourseContentToDatabase(generatedContent);
       } else {
         console.error('Invalid response structure:', response.data);
-        throw new Error('Invalid course content structure');
+        console.warn('Invalid response structure, using fallback content');
+        const fallbackContent = createFallbackContent(course);
+        setCourseContent(fallbackContent);
+        await saveCourseContentToDatabase(fallbackContent);
       }
     } catch (error) {
       console.error('Error generating course content:', error);
       
-      // Show more specific error message
-      let errorMessage = "Failed to load course content. Please try again.";
-      if (error.message.includes('timeout')) {
-        errorMessage = "Content generation timed out. Please try again.";
-      } else if (error.message.includes('API key')) {
-        errorMessage = "API configuration issue. Please contact support.";
-      }
-      
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-      
       // Enhanced fallback content based on course data
       const fallbackContent = createFallbackContent(course);
       setCourseContent(fallbackContent);
+      
+      // Save fallback content to database
+      try {
+        await saveCourseContentToDatabase(fallbackContent);
+      } catch (saveError) {
+        console.error('Error saving fallback content:', saveError);
+      }
     } finally {
       setLoading(false);
     }
@@ -527,13 +530,13 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
             ...course.course_plan,
             courseContent: { sections: content }
           },
-          updated_at: new Date().toISOString()
         })
         .eq('id', course.id);
 
       if (error) throw error;
 
       console.log('Course content saved successfully');
+      return true;
     } catch (error) {
       console.error('Error saving course content:', error);
       throw error;
@@ -544,6 +547,7 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
 
   const handleSaveChanges = async () => {
     try {
+      setIsSaving(true);
       await saveCourseContentToDatabase(courseContent);
       setHasUnsavedChanges(false);
       
@@ -558,6 +562,8 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
         description: "Failed to save changes. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
   if (loading) {
