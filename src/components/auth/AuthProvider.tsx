@@ -60,29 +60,64 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // Also refresh subscription data for license count
       if (profileData.role === 'Admin') {
-        const { data: subscriber, error: subError } = await supabase
-          .from('subscribers')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
+        try {
+          const { data: subscriber, error: subError } = await supabase
+            .from('subscribers')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
         
-        console.log('✅ Fresh subscriber data:', subscriber);
-        if (subscriber && !subError) {
-          setLicenseCount(subscriber.licenses_purchased);
-          
-          // Update profile plan if subscriber has different plan
-          if (subscriber.subscription_tier && subscriber.subscription_tier !== profileData.plan) {
-            console.log('🔄 Updating profile plan to match subscription:', subscriber.subscription_tier);
+          if (subError) {
+            console.log('⚠️ No subscriber record found, error:', subError.code, subError.message);
             
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({ plan: subscriber.subscription_tier })
-              .eq('id', user.id);
+            // If no subscriber record exists, create one for Pro users
+            if (profileData.plan === 'Pro') {
+              console.log('🔄 Creating subscriber record for Pro user...');
               
-            if (!updateError) {
-              setProfile(prev => ({ ...prev, plan: subscriber.subscription_tier }));
+              const { data: newSubscriber, error: createError } = await supabase
+                .from('subscribers')
+                .insert({
+                  user_id: user.id,
+                  email: user.email,
+                  stripe_customer_id: `manual_${user.id}`,
+                  subscribed: true,
+                  subscription_tier: 'Pro',
+                  licenses_purchased: 25,
+                  licenses_used: 1,
+                  subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+                })
+                .select()
+                .single();
+              
+              if (createError) {
+                console.error('❌ Error creating subscriber record:', createError);
+              } else {
+                console.log('✅ Created new subscriber record:', newSubscriber);
+                setLicenseCount(newSubscriber.licenses_purchased);
+              }
+            }
+          } else {
+            console.log('✅ Fresh subscriber data:', subscriber);
+            if (subscriber) {
+              setLicenseCount(subscriber.licenses_purchased);
+              
+              // Update profile plan if subscriber has different plan
+              if (subscriber.subscription_tier && subscriber.subscription_tier !== profileData.plan) {
+                console.log('🔄 Updating profile plan to match subscription:', subscriber.subscription_tier);
+                
+                const { error: updateError } = await supabase
+                  .from('profiles')
+                  .update({ plan: subscriber.subscription_tier })
+                  .eq('id', user.id);
+                  
+                if (!updateError) {
+                  setProfile(prev => ({ ...prev, plan: subscriber.subscription_tier }));
+                }
+              }
             }
           }
+        } catch (subscriberError) {
+          console.error('❌ Error handling subscriber data:', subscriberError);
         }
       }
       

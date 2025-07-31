@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useCompanyContext } from '@/hooks/useCompanyContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -108,15 +109,60 @@ const Profile: React.FC = () => {
             <p><strong>Email:</strong> {user?.email || 'Not available'}</p>
             <p><strong>Group ID:</strong> {profile?.group_id || 'Not set'}</p>
             <p><strong>Company:</strong> {profile?.company_name || 'Not set'}</p>
+            <p><strong>License Count:</strong> {licenseCount || 'Not set'}</p>
           </div>
           <div className="mt-3 p-3 bg-white rounded border">
             <p className="text-xs text-gray-600 mb-2"><strong>Instructions:</strong></p>
             <p className="text-xs text-gray-600">
-              1. Check your subscription in Supabase Dashboard → Database → subscribers table<br/>
+              1. Run the migration below to create your subscriber record<br/>
               2. Click "Refresh Profile" above to sync the latest data<br/>
               3. If still showing Free, check browser console for errors
             </p>
           </div>
+        </div>
+
+        {/* Manual Subscriber Creation */}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-green-900 mb-3">Create Subscriber Record</h3>
+          <p className="text-sm text-green-800 mb-4">
+            If you manually added yourself to the subscribers table but it's not working, 
+            click this button to create a proper subscriber record:
+          </p>
+          <Button
+            onClick={async () => {
+              try {
+                const { data, error } = await supabase.functions.invoke('create-manual-subscriber', {
+                  body: { 
+                    plan: 'Pro',
+                    licenses: 25 
+                  }
+                });
+                
+                if (error) throw error;
+                
+                toast({
+                  title: "Subscriber Record Created",
+                  description: "Your Pro subscription has been activated. Refreshing profile...",
+                });
+                
+                // Wait a moment then refresh
+                setTimeout(() => {
+                  handleRefreshProfile();
+                }, 1000);
+                
+              } catch (error: any) {
+                console.error('Error creating subscriber:', error);
+                toast({
+                  title: "Creation Failed",
+                  description: error.message || "Failed to create subscriber record.",
+                  variant: "destructive",
+                });
+              }
+            }}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            Create Pro Subscriber Record
+          </Button>
         </div>
 
         <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
