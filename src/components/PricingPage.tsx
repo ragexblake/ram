@@ -108,23 +108,28 @@ const PricingPage: React.FC = () => {
           description: "Please sign in to upgrade to Pro plan.",
           variant: "destructive",
         });
+        setLoading(false);
         return;
       }
 
       const response = await supabase.functions.invoke('create-checkout', {
         body: {
           users: pricingOptions.users,
-          billing: pricingOptions.billing
+          billing: pricingOptions.billing,
+          plan: 'pro'
         }
       });
 
       if (response.error) {
+        console.error('Checkout error:', response.error);
         throw new Error(response.error.message);
       }
 
       if (response.data?.url) {
-        // Open Stripe checkout in a new tab
-        window.open(response.data.url, '_blank');
+        // Redirect to Stripe checkout
+        window.location.href = response.data.url;
+      } else {
+        throw new Error('No checkout URL received');
       }
     } catch (error) {
       console.error('Error creating checkout:', error);
