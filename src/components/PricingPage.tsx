@@ -5,10 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import CheckoutButton from '@/components/stripe/CheckoutButton';
+import { useToast } from '@/hooks/use-toast';
+import { RefreshCw } from 'lucide-react';
 
 const PricingPage: React.FC = () => {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [refreshing, setRefreshing] = useState(false);
+  const { toast } = useToast();
 
   console.log('PricingPage - Current user plan:', profile?.plan);
   const isProUser = profile?.plan === 'Pro';
@@ -106,11 +110,51 @@ const PricingPage: React.FC = () => {
     }
   ];
 
+  const handleRefreshProfile = async () => {
+    setRefreshing(true);
+    try {
+      await refreshProfile();
+      toast({
+        title: "Profile Refreshed",
+        description: "Your subscription status has been updated.",
+      });
+    } catch (error) {
+      toast({
+        title: "Refresh Failed",
+        description: "Failed to refresh profile data.",
+        variant: "destructive",
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
   return (
     <div className="min-h-screen bg-white py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="text-center mb-12">
+          {/* Debug Section */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 max-w-md mx-auto">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-yellow-900">Debug Info</h3>
+              <Button
+                onClick={handleRefreshProfile}
+                disabled={refreshing}
+                size="sm"
+                variant="outline"
+                className="flex items-center space-x-1"
+              >
+                <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+                <span className="text-xs">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+              </Button>
+            </div>
+            <div className="text-xs text-yellow-800">
+              <p><strong>Current Plan:</strong> {profile?.plan || 'Not detected'}</p>
+              <p><strong>Is Pro:</strong> {isProUser ? 'Yes' : 'No'}</p>
+              <p><strong>Is Enterprise:</strong> {isEnterpriseUser ? 'Yes' : 'No'}</p>
+            </div>
+          </div>
+
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Predictable pricing, scalable plans
           </h1>

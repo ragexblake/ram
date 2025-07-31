@@ -9,6 +9,7 @@ interface AuthContextType {
   loading: boolean;
   authInitialized: boolean;
   licenseCount: number;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,6 +33,64 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [licenseCount, setLicenseCount] = useState<number>(0);
   const [authInitialized, setAuthInitialized] = useState(false);
+
+  const refreshProfile = async () => {
+    if (!user?.id) {
+      console.log('No user ID available for profile refresh');
+      return;
+    }
+
+    try {
+      console.log('🔄 Manually refreshing profile for user:', user.id);
+      
+      // Fetch fresh profile data
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileError) {
+        console.error('❌ Error refreshing profile:', profileError);
+        return;
+      }
+
+      console.log('✅ Fresh profile data loaded:', profileData);
+      setProfile(profileData);
+      
+      // Also refresh subscription data for license count
+      if (profileData.role === 'Admin') {
+        const { data: subscriber, error: subError } = await supabase
+          .from('subscribers')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+        
+        console.log('✅ Fresh subscriber data:', subscriber);
+        if (subscriber && !subError) {
+          setLicenseCount(subscriber.licenses_purchased);
+          
+          // Update profile plan if subscriber has different plan
+          if (subscriber.subscription_tier && subscriber.subscription_tier !== profileData.plan) {
+            console.log('🔄 Updating profile plan to match subscription:', subscriber.subscription_tier);
+            
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ plan: subscriber.subscription_tier })
+              .eq('id', user.id);
+              
+            if (!updateError) {
+              setProfile(prev => ({ ...prev, plan: subscriber.subscription_tier }));
+            }
+          }
+        }
+      }
+      
+      console.log('✅ Profile refresh completed');
+    } catch (error) {
+      console.error('❌ Error in refreshProfile:', error);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -132,20 +191,42 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
-      console.log('Profile loaded with plan:', profileData?.plan);
+      console.log('Profile loaded:', {
+        plan: profileData?.plan,
+        role: profileData?.role,
+        id: profileData?.id,
+        full_name: profileData?.full_name
+      });
       setProfile(profileData);
       
       // Fetch subscription data for license count
       if (profileData.role === 'Admin') {
-        const { data: subscriber } = await supabase
+        const { data: subscriber, error: subError } = await supabase
           .from('subscribers')
-          .select('licenses_purchased')
+          .select('*')
           .eq('user_id', user.id)
-          .maybeSingle();
+          .single();
         
-        console.log('Subscriber data:', subscriber);
-        if (subscriber) {
+        console.log('Subscriber data:', subscriber, 'Error:', subError);
+        if (subscriber && !subError) {
           setLicenseCount(subscriber.licenses_purchased);
+          
+          // Sync profile plan with subscription tier if different
+          if (subscriber.subscription_tier && subscriber.subscription_tier !== profileData.plan) {
+            console.log('🔄 Profile plan mismatch detected. Updating profile plan to:', subscriber.subscription_tier);
+            
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ plan: subscriber.subscription_tier })
+              .eq('id', user.id);
+              
+            if (!updateError) {
+              setProfile(prev => ({ ...prev, plan: subscriber.subscription_tier }));
+              console.log('✅ Profile plan updated to match subscription');
+            }
+          }
+        } else if (subError && subError.code !== 'PGRST116') {
+          console.error('Error fetching subscriber data:', subError);
         }
       }
     } catch (error) {
@@ -159,7 +240,8 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     session,
     loading,
     authInitialized,
-    licenseCount
+    licenseCount,
+    refreshProfile
   };
 
   return (
