@@ -132,7 +132,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
-      console.log('Profile loaded:', profileData);
+      console.log('Profile loaded with plan:', profileData?.plan);
       setProfile(profileData);
       
       // Fetch subscription data for license count
@@ -143,6 +143,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           .eq('user_id', user.id)
           .maybeSingle();
         
+        console.log('Subscriber data:', subscriber);
         if (subscriber) {
           setLicenseCount(subscriber.licenses_purchased);
         }

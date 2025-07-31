@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '@/components/auth/AuthProvider';
 import { Check, Infinity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -6,7 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import CheckoutButton from '@/components/stripe/CheckoutButton';
 
 const PricingPage: React.FC = () => {
+  const { profile } = useAuth();
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+
+  console.log('PricingPage - Current user plan:', profile?.plan);
+  const isProUser = profile?.plan === 'Pro';
+  const isEnterpriseUser = profile?.plan === 'Enterprise';
 
   const pricingPlans = [
     {
@@ -208,22 +214,42 @@ const PricingPage: React.FC = () => {
                      <Button 
                        className={`w-full ${plan.buttonColor} text-white font-medium`}
                        variant="default"
+                      disabled={isProUser || isEnterpriseUser}
                      >
-                       {plan.buttonText}
+                      {isProUser || isEnterpriseUser ? 'Current Plan' : plan.buttonText}
                      </Button>
                    ) : (
-                     <CheckoutButton
-                       plan={plan.plan}
-                       billing={billingCycle}
-                       price={billingCycle === 'monthly' ? 
-                         parseInt(plan.price.replace('$', '')) : 
-                         parseInt(plan.price.replace('$', '')) * 0.8
-                       }
-                       users={1}
-                       className={`w-full ${plan.buttonColor} text-white font-medium`}
-                     >
-                       {plan.buttonText}
-                     </CheckoutButton>
+                    <>
+                      {(isProUser && plan.plan === 'standard') || 
+                       (isEnterpriseUser && (plan.plan === 'standard' || plan.plan === 'pro')) ? (
+                        <Button 
+                          className="w-full bg-gray-400 text-white font-medium"
+                          disabled
+                        >
+                          {isProUser && plan.plan === 'standard' ? 'Downgrade' : 'Current Plan'}
+                        </Button>
+                      ) : (isProUser && plan.plan === 'pro') || (isEnterpriseUser && plan.plan === 'business') ? (
+                        <Button 
+                          className="w-full bg-green-600 text-white font-medium"
+                          disabled
+                        >
+                          Current Plan
+                        </Button>
+                      ) : (
+                        <CheckoutButton
+                          plan={plan.plan}
+                          billing={billingCycle}
+                          price={billingCycle === 'monthly' ? 
+                            parseInt(plan.price.replace('$', '')) : 
+                            parseInt(plan.price.replace('$', '')) * 0.8
+                          }
+                          users={1}
+                          className={`w-full ${plan.buttonColor} text-white font-medium`}
+                        >
+                          {plan.buttonText}
+                        </CheckoutButton>
+                      )}
+                    </>
                    )}
                    
                    {plan.disclaimer && (
