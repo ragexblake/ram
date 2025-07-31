@@ -14,10 +14,34 @@ serve(async (req) => {
   }
 
   try {
-    const { users, billing } = await req.json();
+    const { plan, billing, price } = await req.json();
 
-    if (!users || users < 1) {
-      throw new Error('Invalid number of users');
+    if (!plan || !billing || !price) {
+      throw new Error('Missing required parameters: plan, billing, price');
+    }
+
+    // Define plan details
+    const planDetails = {
+      'standard': {
+        name: 'ONEGO Standard Plan',
+        description: 'Great for small businesses',
+        credits: '500 Credits per month + $0.20/extra credit'
+      },
+      'pro': {
+        name: 'ONEGO Pro Plan',
+        description: 'Perfect for growing companies',
+        credits: '1,500 Credits per month + $0.20/extra credit'
+      },
+      'business': {
+        name: 'ONEGO Business Plan',
+        description: 'Ideal for larger organizations',
+        credits: '4,000 Credits per month + $0.20/extra credit'
+      }
+    };
+
+    const selectedPlan = planDetails[plan as keyof typeof planDetails];
+    if (!selectedPlan) {
+      throw new Error('Invalid plan specified');
     }
 
     const supabaseClient = createClient(
@@ -47,9 +71,7 @@ serve(async (req) => {
     }
 
     // Calculate pricing based on billing cycle
-    const monthlyPrice = 19; // $19 per user per month
-    const yearlyPrice = 15.20; // $15.20 per user per month (20% discount)
-    const unitAmount = billing === 'yearly' ? Math.round(yearlyPrice * 100) : Math.round(monthlyPrice * 100);
+    const unitAmount = Math.round(price * 100); // Convert to cents
     const interval = billing === 'yearly' ? 'year' : 'month';
 
     const session = await stripe.checkout.sessions.create({
@@ -60,8 +82,8 @@ serve(async (req) => {
           price_data: {
             currency: "usd",
             product_data: { 
-              name: `ONEGO Pro Plan - ${users} User${users > 1 ? 's' : ''}`,
-              description: `Professional learning platform for ${users} user${users > 1 ? 's' : ''}`
+              name: selectedPlan.name,
+              description: `${selectedPlan.description} - ${selectedPlan.credits}`
             },
             unit_amount: unitAmount,
             recurring: { 
@@ -69,7 +91,7 @@ serve(async (req) => {
               interval_count: 1
             },
           },
-          quantity: users,
+          quantity: 1,
         },
       ],
       mode: "subscription",
@@ -77,8 +99,7 @@ serve(async (req) => {
       cancel_url: `${req.headers.get("origin")}/upgrade?canceled=true`,
       metadata: {
         user_id: user.id,
-        plan: 'Pro',
-        users: users.toString(),
+        plan: plan,
         billing: billing
       }
     });
