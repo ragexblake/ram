@@ -20,7 +20,11 @@ const PricingPage: React.FC = () => {
     billing: 'monthly',
     users: 5,
   });
-  const [loading, setLoading] = useState(false);
+  const [loadingStates, setLoadingStates] = useState({
+    standard: false,
+    pro: false,
+    business: false
+  });
   const { toast } = useToast();
 
   const freeFeatures = [
@@ -98,7 +102,7 @@ const PricingPage: React.FC = () => {
   };
 
   const handleUpgradeToPro = async () => {
-    setLoading(true);
+    setLoadingStates(prev => ({ ...prev, standard: true }));
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -134,7 +138,130 @@ const PricingPage: React.FC = () => {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setLoadingStates(prev => ({ ...prev, standard: false }));
+    }
+  };
+
+  const handleStandardCheckout = async () => {
+    setLoadingStates(prev => ({ ...prev, standard: true }));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to upgrade to Standard plan.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await supabase.functions.invoke('create-checkout', {
+        body: {
+          plan: 'standard',
+          billing: pricingOptions.billing,
+          price: pricingOptions.billing === 'monthly' ? 149 : 119.20
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      if (response.data?.url) {
+        window.open(response.data.url, '_blank');
+      }
+    } catch (error) {
+      console.error('Error creating checkout:', error);
+      toast({
+        title: "Checkout Error",
+        description: "Failed to create checkout session. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingStates(prev => ({ ...prev, standard: false }));
+    }
+  };
+
+  const handleProCheckout = async () => {
+    setLoadingStates(prev => ({ ...prev, pro: true }));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to upgrade to Pro plan.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await supabase.functions.invoke('create-checkout', {
+        body: {
+          plan: 'pro',
+          billing: pricingOptions.billing,
+          price: pricingOptions.billing === 'monthly' ? 299 : 239.20
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      if (response.data?.url) {
+        window.open(response.data.url, '_blank');
+      }
+    } catch (error) {
+      console.error('Error creating checkout:', error);
+      toast({
+        title: "Checkout Error",
+        description: "Failed to create checkout session. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingStates(prev => ({ ...prev, pro: false }));
+    }
+  };
+
+  const handleBusinessCheckout = async () => {
+    setLoadingStates(prev => ({ ...prev, business: true }));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to upgrade to Business plan.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await supabase.functions.invoke('create-checkout', {
+        body: {
+          plan: 'business',
+          billing: pricingOptions.billing,
+          price: pricingOptions.billing === 'monthly' ? 699 : 559.20
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      if (response.data?.url) {
+        window.open(response.data.url, '_blank');
+      }
+    } catch (error) {
+      console.error('Error creating checkout:', error);
+      toast({
+        title: "Checkout Error",
+        description: "Failed to create checkout session. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingStates(prev => ({ ...prev, business: false }));
     }
   };
 
@@ -254,11 +381,11 @@ const PricingPage: React.FC = () => {
               ))}
             </ul>
             <button 
-              onClick={handleUpgradeToPro}
-              disabled={loading}
+              onClick={handleStandardCheckout}
+              disabled={loadingStates.standard}
               className="w-full py-3 px-4 bg-green-500 text-white rounded-lg font-medium hover:bg-green-400 disabled:opacity-50 flex items-center justify-center"
             >
-              {loading ? (
+              {loadingStates.standard ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Processing...
@@ -296,11 +423,11 @@ const PricingPage: React.FC = () => {
               ))}
             </ul>
             <button 
-              onClick={handleUpgradeToPro}
-              disabled={loading}
+              onClick={handleProCheckout}
+              disabled={loadingStates.pro}
               className="w-full py-3 px-4 bg-green-500 text-white rounded-lg font-medium hover:bg-green-400 disabled:opacity-50 flex items-center justify-center"
             >
-              {loading ? (
+              {loadingStates.pro ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Processing...
@@ -333,10 +460,18 @@ const PricingPage: React.FC = () => {
               ))}
             </ul>
             <button 
-              onClick={sendEnterpriseEmail}
+              onClick={handleBusinessCheckout}
+              disabled={loadingStates.business}
               className="w-full py-3 px-4 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-400 flex items-center justify-center"
             >
-              Get Started
+              {loadingStates.business ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Processing...
+                </>
+              ) : (
+                'Get Started'
+              )}
             </button>
           </div>
         </div>
