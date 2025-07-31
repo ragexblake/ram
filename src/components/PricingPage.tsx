@@ -268,7 +268,13 @@ const PricingPage: React.FC = () => {
       });
     } finally {
       setLoadingStates(prev => ({ ...prev, business: false }));
+    }
+  };
 
+  return (
+    <div>
+      <div>
+        <div>
           {/* Business Plan */}
           <div className="bg-white rounded-lg border-2 border-orange-500 p-6 shadow-sm">
             <div className="text-center mb-6">
@@ -296,19 +302,26 @@ const PricingPage: React.FC = () => {
               price={pricingOptions.billing === 'monthly' ? 699 : 559.20}
               users={1}
               className="w-full py-3 px-4 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-400"
-              users={1}
-              className="w-full py-3 px-4 bg-green-500 text-white rounded-lg font-medium hover:bg-green-400"
-              users={1}
-              className="w-full py-3 px-4 bg-green-500 text-white rounded-lg font-medium hover:bg-green-400"
             >
               Get Started
             </CheckoutButton>
+          </div>
+          
+          {/* Enterprise Plan */}
+          <div className="bg-white rounded-lg border-2 border-purple-500 p-6 shadow-sm">
+            <div className="text-center mb-6">
               <h3 className="text-2xl font-bold text-gray-900 mb-2">Enterprise</h3>
               <p className="text-gray-600 text-sm mb-4">For large-scale deployments</p>
               <div className="mb-6">
                 <p className="text-purple-600 font-medium mb-2">Let's Talk</p>
+              </div>
+            </div>
+            <button
+              onClick={sendEnterpriseEmail}
+              className="w-full py-3 px-4 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-400 mb-6"
+            >
               Get Started
-            </CheckoutButton>
+            </button>
             <ul className="space-y-3">
               {enterpriseFeatures.map((feature) => (
                 <li key={feature.id} className="flex items-center">
