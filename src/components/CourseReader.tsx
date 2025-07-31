@@ -10,7 +10,6 @@ interface CourseReaderProps {
   course: any;
   user: any;
   onBack: () => void;
-  readOnly?: boolean;
 }
 
 interface CourseSection {
@@ -34,7 +33,7 @@ interface QuizQuestion {
   correctAnswer: number;
 }
 
-const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack, readOnly = false }) => {
+const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => {
   const [courseContent, setCourseContent] = useState<CourseSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
@@ -56,9 +55,6 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack, readO
   const [newTopicContent, setNewTopicContent] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [showAddSection, setShowAddSection] = useState(false);
-  const [newSectionTitle, setNewSectionTitle] = useState('');
-  const [newSectionDescription, setNewSectionDescription] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -523,32 +519,6 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack, readO
     });
   };
 
-  const handleAddSection = () => {
-    if (!newSectionTitle.trim()) {
-      toast({
-        title: "Missing Title",
-        description: "Please provide a title for the new section.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const newSection = {
-      id: `section-${Date.now()}`,
-      title: newSectionTitle.trim(),
-      description: newSectionDescription.trim(),
-      subsections: [],
-    };
-    setCourseContent(prev => [...prev, newSection]);
-    setShowAddSection(false);
-    setNewSectionTitle('');
-    setNewSectionDescription('');
-    setHasUnsavedChanges(true);
-    toast({
-      title: "Section Added",
-      description: "New section has been added to the course.",
-    });
-  };
-
   const saveCourseContentToDatabase = async (content: CourseSection[]) => {
     try {
       setIsSaving(true);
@@ -887,37 +857,35 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack, readO
                           </span>
                         )}
                         
-                        {/* Edit and Delete buttons (hidden in readOnly mode) */}
-                        {!readOnly && (
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1 ml-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditSubsection(subsection);
-                              }}
-                              className="p-1 hover:bg-blue-100 rounded"
-                              title="Edit topic"
-                            >
-                              <Edit className="h-3 w-3 text-blue-600" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteSubsection(sectionIndex, subsectionIndex);
-                              }}
-                              className="p-1 hover:bg-red-100 rounded"
-                              title="Delete topic"
-                            >
-                              <Trash2 className="h-3 w-3 text-red-600" />
-                            </button>
-                          </div>
-                        )}
+                        {/* Edit and Delete buttons */}
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1 ml-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditSubsection(subsection);
+                            }}
+                            className="p-1 hover:bg-blue-100 rounded"
+                            title="Edit topic"
+                          >
+                            <Edit className="h-3 w-3 text-blue-600" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSubsection(sectionIndex, subsectionIndex);
+                            }}
+                            className="p-1 hover:bg-red-100 rounded"
+                            title="Delete topic"
+                          >
+                            <Trash2 className="h-3 w-3 text-red-600" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
                   
-                  {/* Add Topic Button for current section (hidden in readOnly mode) */}
-                  {sectionIndex === currentSectionIndex && !readOnly && (
+                  {/* Add Topic Button for current section */}
+                  {sectionIndex === currentSectionIndex && (
                     <button
                       onClick={() => setShowAddTopic(true)}
                       className="w-full flex items-center justify-center p-3 text-blue-600 hover:bg-blue-50 border-t border-gray-200"
@@ -936,17 +904,6 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack, readO
         <div className="p-4 border-t border-gray-200 bg-gray-50">
           <h4 className="font-semibold text-gray-800 mb-3">Course Management</h4>
           <div className="space-y-2">
-            {!readOnly && (
-              <Button
-                onClick={() => setShowAddSection(true)}
-                size="sm"
-                variant="outline"
-                className="w-full flex items-center justify-center space-x-2"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add New Section</span>
-              </Button>
-            )}
             {hasUnsavedChanges && (
               <Button
                 onClick={handleSaveChanges}
@@ -967,17 +924,15 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack, readO
                 )}
               </Button>
             )}
-            {!readOnly && (
-              <Button
-                onClick={() => setShowAddTopic(true)}
-                size="sm"
-                variant="outline"
-                className="w-full flex items-center justify-center space-x-2"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add New Topic</span>
-              </Button>
-            )}
+            <Button
+              onClick={() => setShowAddTopic(true)}
+              size="sm"
+              variant="outline"
+              className="w-full flex items-center justify-center space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add New Topic</span>
+            </Button>
           </div>
         </div>
       </div>
@@ -1192,55 +1147,6 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack, readO
                 <Button onClick={handleAddTopic} className="flex items-center space-x-2">
                   <Plus className="h-4 w-4" />
                   <span>Add Topic</span>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Add Section Modal */}
-      {showAddSection && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold mb-4">Add New Section</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Section Title
-                </label>
-                <Input
-                  value={newSectionTitle}
-                  onChange={(e) => setNewSectionTitle(e.target.value)}
-                  placeholder="Enter section title"
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description (optional)
-                </label>
-                <Textarea
-                  value={newSectionDescription}
-                  onChange={(e) => setNewSectionDescription(e.target.value)}
-                  placeholder="Enter section description"
-                  rows={3}
-                  className="w-full font-mono text-sm"
-                />
-              </div>
-              <div className="flex justify-end space-x-3">
-                <Button
-                  onClick={() => {
-                    setShowAddSection(false);
-                    setNewSectionTitle('');
-                    setNewSectionDescription('');
-                  }}
-                  variant="outline"
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleAddSection} className="flex items-center space-x-2">
-                  <Plus className="h-4 w-4" />
-                  <span>Add Section</span>
                 </Button>
               </div>
             </div>
