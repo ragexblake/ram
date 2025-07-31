@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { users, billing, plan = 'pro' } = await req.json();
+    const { users, billing } = await req.json();
 
     if (!users || users < 1) {
       throw new Error('Invalid number of users');
@@ -47,17 +47,10 @@ serve(async (req) => {
     }
 
     // Calculate pricing based on billing cycle
-    const planPricing = {
-      standard: { monthly: 149, yearly: 119.20 },
-      pro: { monthly: 299, yearly: 239.20 },
-      business: { monthly: 699, yearly: 559.20 }
-    };
-    
-    const pricing = planPricing[plan as keyof typeof planPricing] || planPricing.pro;
-    const unitAmount = billing === 'yearly' ? Math.round(pricing.yearly * 100) : Math.round(pricing.monthly * 100);
+    const monthlyPrice = 19; // $19 per user per month
+    const yearlyPrice = 15.20; // $15.20 per user per month (20% discount)
+    const unitAmount = billing === 'yearly' ? Math.round(yearlyPrice * 100) : Math.round(monthlyPrice * 100);
     const interval = billing === 'yearly' ? 'year' : 'month';
-    
-    const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -67,7 +60,7 @@ serve(async (req) => {
           price_data: {
             currency: "usd",
             product_data: { 
-              name: `ONEGO ${planName} Plan - ${users} User${users > 1 ? 's' : ''}`,
+              name: `ONEGO Pro Plan - ${users} User${users > 1 ? 's' : ''}`,
               description: `Professional learning platform for ${users} user${users > 1 ? 's' : ''}`
             },
             unit_amount: unitAmount,
@@ -84,7 +77,7 @@ serve(async (req) => {
       cancel_url: `${req.headers.get("origin")}/upgrade?canceled=true`,
       metadata: {
         user_id: user.id,
-        plan: planName,
+        plan: 'Pro',
         users: users.toString(),
         billing: billing
       }

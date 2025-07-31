@@ -13,7 +13,6 @@ import AccountSettings from '@/components/AccountSettings';
 import Profile from '@/components/Profile';
 import HonestBox from '@/components/HonestBox';
 import CourseReader from '@/components/CourseReader';
-import StripeCheckout from '@/components/StripeCheckout';
 
 interface ContentRendererProps {
   activeTab: string;
@@ -85,7 +84,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
         return <Profile />;
       
       case 'upgrade':
-        return profile?.role === 'Admin' ? <StripeCheckout /> : <PricingPage />;
+        return <PricingPage />;
       
       case 'settings':
         // Only show Settings for Admin users
