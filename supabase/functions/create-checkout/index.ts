@@ -14,11 +14,13 @@ serve(async (req) => {
   }
 
   try {
-    const { plan, billing, price } = await req.json();
+    const { plan, billing, price, users } = await req.json();
 
     if (!plan || !billing || !price) {
       throw new Error('Missing required parameters: plan, billing, price');
     }
+
+    console.log('Checkout request:', { plan, billing, price, users });
 
     // Define plan details
     const planDetails = {
@@ -44,6 +46,8 @@ serve(async (req) => {
       throw new Error('Invalid plan specified');
     }
 
+    console.log('Selected plan:', selectedPlan);
+
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
@@ -59,20 +63,36 @@ serve(async (req) => {
     const user = userData.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
 
+    console.log('User authenticated:', user.email);
+
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
+
+    if (!Deno.env.get("STRIPE_SECRET_KEY")) {
+      throw new Error("Stripe secret key not configured");
+    }
 
     // Check if customer exists
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId;
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
+      console.log('Existing customer found:', customerId);
+    } else {
+      console.log('New customer will be created');
     }
 
     // Calculate pricing based on billing cycle
     const unitAmount = Math.round(price * 100); // Convert to cents
     const interval = billing === 'yearly' ? 'year' : 'month';
+
+    console.log('Creating checkout session with:', {
+      unitAmount,
+      interval,
+      customerId,
+      userEmail: user.email
+    });
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -103,6 +123,8 @@ serve(async (req) => {
         billing: billing
       }
     });
+
+    console.log('Checkout session created successfully:', session.id);
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

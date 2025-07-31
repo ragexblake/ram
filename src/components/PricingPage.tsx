@@ -160,22 +160,26 @@ const PricingPage: React.FC = () => {
         body: {
           plan: 'standard',
           billing: pricingOptions.billing,
-          price: pricingOptions.billing === 'monthly' ? 149 : 119.20
+          price: pricingOptions.billing === 'monthly' ? 149 : 119.20,
+          users: 1
         }
       });
 
       if (response.error) {
+        console.error('Checkout error:', response.error);
         throw new Error(response.error.message);
       }
 
       if (response.data?.url) {
         window.open(response.data.url, '_blank');
+      } else {
+        throw new Error('No checkout URL received');
       }
     } catch (error) {
       console.error('Error creating checkout:', error);
       toast({
         title: "Checkout Error",
-        description: "Failed to create checkout session. Please try again.",
+        description: error.message || "Failed to create checkout session. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -201,22 +205,26 @@ const PricingPage: React.FC = () => {
         body: {
           plan: 'pro',
           billing: pricingOptions.billing,
-          price: pricingOptions.billing === 'monthly' ? 299 : 239.20
+          price: pricingOptions.billing === 'monthly' ? 299 : 239.20,
+          users: 1
         }
       });
 
       if (response.error) {
+        console.error('Checkout error:', response.error);
         throw new Error(response.error.message);
       }
 
       if (response.data?.url) {
         window.open(response.data.url, '_blank');
+      } else {
+        throw new Error('No checkout URL received');
       }
     } catch (error) {
       console.error('Error creating checkout:', error);
       toast({
         title: "Checkout Error",
-        description: "Failed to create checkout session. Please try again.",
+        description: error.message || "Failed to create checkout session. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -242,22 +250,26 @@ const PricingPage: React.FC = () => {
         body: {
           plan: 'business',
           billing: pricingOptions.billing,
-          price: pricingOptions.billing === 'monthly' ? 699 : 559.20
+          price: pricingOptions.billing === 'monthly' ? 699 : 559.20,
+          users: 1
         }
       });
 
       if (response.error) {
+        console.error('Checkout error:', response.error);
         throw new Error(response.error.message);
       }
 
       if (response.data?.url) {
         window.open(response.data.url, '_blank');
+      } else {
+        throw new Error('No checkout URL received');
       }
     } catch (error) {
       console.error('Error creating checkout:', error);
       toast({
         title: "Checkout Error",
-        description: "Failed to create checkout session. Please try again.",
+        description: error.message || "Failed to create checkout session. Please try again.",
         variant: "destructive",
       });
     } finally {
