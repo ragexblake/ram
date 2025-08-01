@@ -104,173 +104,34 @@ const EducationalStepRenderer: React.FC<EducationalStepRendererProps> = ({
         </div>
       );
 
-    case 2:
-      const subjectSuggestions = getSubjectSuggestions(formData.educationalLevel || '');
-      return (
-        <div className="space-y-6">
-          <h3 className="text-xl font-semibold text-gray-900">What subject are you teaching?</h3>
-          <p className="text-gray-600">Tell me the main subject or topic for this lesson.</p>
-          
-          {subjectSuggestions.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-gray-700">Popular subjects for {formData.educationalLevel}:</p>
-              <div className="flex flex-wrap gap-2">
-                {subjectSuggestions.map((subject) => (
-                  <button
-                    key={subject}
-                    onClick={() => handleSuggestionClick('subject', subject)}
-                    className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-green-100 hover:text-green-700 transition-colors"
-                  >
-                    {subject}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          <input
-            type="text"
-            value={formData.subject || ''}
-            onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-            placeholder="Enter subject (e.g., Mathematics, History, Science)"
-            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          />
-        </div>
-      );
+
 
     case 3:
-      const objectiveSuggestions = getObjectiveSuggestions(formData.subject || '');
       return (
         <div className="space-y-6">
-          <h3 className="text-xl font-semibold text-gray-900">What's the main learning objective?</h3>
-          <p className="text-gray-600">What specific skill or knowledge should students gain from this lesson?</p>
-          
-          {objectiveSuggestions.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-gray-700">Common objectives for {formData.subject}:</p>
-              <div className="flex flex-wrap gap-2">
-                {objectiveSuggestions.map((objective) => (
-                  <button
-                    key={objective}
-                    onClick={() => handleSuggestionClick('objective', objective)}
-                    className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-full hover:bg-green-100 hover:text-green-700 transition-colors"
-                  >
-                    {objective}
-                  </button>
-                ))}
+          <div>
+            <h3 className="text-xl font-semibold mb-2">Describe your learner</h3>
+            <p className="text-gray-600 mb-4">Who is this training for?</p>
+            <textarea
+              value={formData.audience || ''}
+              onChange={(e) => setFormData({ ...formData, audience: e.target.value })}
+              placeholder="e.g., High school students, university graduates, working professionals, beginners in the field"
+              className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+              rows={4}
+            />
+            {formData.educationalLevel && (
+              <div className="mt-3 p-3 bg-purple-50 rounded-lg">
+                <p className="text-sm text-purple-700">
+                  💡 For {formData.educationalLevel}, consider the typical background and experience level of your students.
+                </p>
               </div>
-            </div>
-          )}
-          
-          <textarea
-            value={formData.objective || ''}
-            onChange={(e) => setFormData({ ...formData, objective: e.target.value })}
-            placeholder="Describe what students should learn or be able to do"
-            rows={4}
-            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          />
-        </div>
-      );
-
-    case 4:
-      return (
-        <div className="space-y-6">
-          <h3 className="text-xl font-semibold text-gray-900">What's the student's current level?</h3>
-          <p className="text-gray-600">This helps me provide the right level of support and explanation.</p>
-          
-          <div className="grid grid-cols-1 gap-3">
-            {supportLevels.map((level) => (
-              <button
-                key={level}
-                onClick={() => setFormData({ ...formData, supportLevel: level })}
-                className={`p-4 text-left rounded-lg border-2 transition-all ${
-                  formData.supportLevel === level
-                    ? 'border-green-500 bg-green-50 text-green-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <span className="font-medium">{level.split(' - ')[0]}</span>
-                <p className="text-sm text-gray-600 mt-1">{level.split(' - ')[1]}</p>
-              </button>
-            ))}
+            )}
           </div>
         </div>
       );
 
-    case 5:
-      return (
-        <div className="space-y-6">
-          <h3 className="text-xl font-semibold text-gray-900">How should I teach this lesson?</h3>
-          <p className="text-gray-600">Choose the teaching methods that work best for your students. (Select multiple)</p>
-          
-          <div className="grid grid-cols-1 gap-3">
-            {sessionTypes.map((type) => (
-              <button
-                key={type}
-                onClick={() => handleMultiSelect('sessionType', type)}
-                className={`p-4 text-left rounded-lg border-2 transition-all ${
-                  formData.sessionType?.includes(type)
-                    ? 'border-green-500 bg-green-50 text-green-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <span className="font-medium">{type}</span>
-              </button>
-            ))}
-          </div>
-          
-          {formData.sessionType?.length > 0 && (
-            <div className="p-4 bg-green-50 rounded-lg">
-              <p className="text-sm text-green-700">
-                Selected: {formData.sessionType.join(', ')}
-              </p>
-            </div>
-          )}
-        </div>
-      );
 
-    case 6:
-      return (
-        <div className="space-y-6">
-          <h3 className="text-xl font-semibold text-gray-900">How long should this lesson be?</h3>
-          <p className="text-gray-600">Choose the ideal duration for your learning session.</p>
-          
-          <div className="grid grid-cols-1 gap-3">
-            {durations.map((duration) => (
-              <button
-                key={duration}
-                onClick={() => setFormData({ ...formData, duration: duration })}
-                className={`p-4 text-left rounded-lg border-2 transition-all ${
-                  formData.duration === duration
-                    ? 'border-green-500 bg-green-50 text-green-700'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <span className="font-medium">{duration.split(' - ')[0]}</span>
-                {duration.includes(' - ') && (
-                  <p className="text-sm text-gray-600 mt-1">{duration.split(' - ')[1]}</p>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      );
 
-    case 7:
-      return (
-        <div className="space-y-6">
-          <h3 className="text-xl font-semibold text-gray-900">Any specific challenges to address?</h3>
-          <p className="text-gray-600">What difficulties do your students typically face with this topic? (Optional)</p>
-          
-          <textarea
-            value={formData.challenges || ''}
-            onChange={(e) => setFormData({ ...formData, challenges: e.target.value })}
-            placeholder="e.g., Students struggle with word problems, difficulty visualizing concepts, need more practice with basics..."
-            rows={4}
-            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          />
-        </div>
-      );
 
     default:
       return (
