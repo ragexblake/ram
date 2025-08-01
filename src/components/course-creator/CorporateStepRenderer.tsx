@@ -55,7 +55,7 @@ const CorporateStepRenderer: React.FC<CorporateStepRendererProps> = ({
       return (
         <div className="space-y-6">
           <div>
-            <h3 className="text-xl font-semibold mb-2">🧩 2. What's your main training goal?</h3>
+            <h3 className="text-xl font-semibold mb-2">🧩 3. What's your main training goal?</h3>
             <p className="text-gray-600 mb-4">What do you want the learner to improve or achieve?</p>
             {formData.industry && (
               <div className="mb-4 p-4 bg-blue-50 rounded-lg">
@@ -94,139 +94,28 @@ const CorporateStepRenderer: React.FC<CorporateStepRendererProps> = ({
       return (
         <div className="space-y-6">
           <div>
-            <h3 className="text-xl font-semibold mb-2">🧩 3. Who is the training for?</h3>
-            <p className="text-gray-600 mb-4">Who's taking this training?</p>
-            <div className="flex flex-wrap gap-2">
-              {getIndustryAudience(formData.industry).map(audience => (
-                <button
-                  key={audience}
-                  onClick={() => setFormData({ ...formData, audience })}
-                  className={`px-4 py-2 rounded-full border ${
-                    formData.audience === audience 
-                      ? 'bg-green-500 text-white border-green-500' 
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
-                  }`}
-                >
-                  {audience}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-
-    case 4:
-      return (
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-xl font-semibold mb-2">🧩 4. What skill level is it for?</h3>
-            <p className="text-gray-600 mb-4">Should we keep it simple, go deep, or challenge the learner?</p>
-            <div className="flex flex-wrap gap-2">
-              {skillLevels.map(level => (
-                <button
-                  key={level}
-                  onClick={() => setFormData({ ...formData, skillLevel: level })}
-                  className={`px-4 py-2 rounded-full border ${
-                    formData.skillLevel === level 
-                      ? 'bg-green-500 text-white border-green-500' 
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
-                  }`}
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-
-    case 5:
-      return (
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-xl font-semibold mb-2">🧩 5. How should the session be delivered?</h3>
-            <p className="text-gray-600 mb-4">What type of learning suits you best?</p>
-            <div className="flex flex-wrap gap-2">
-              {deliveryStyles.map(style => (
-                <button
-                  key={style}
-                  onClick={() => {
-                    const current = formData.deliveryStyle || [];
-                    const updated = current.includes(style) 
-                      ? current.filter((s: string) => s !== style)
-                      : [...current, style];
-                    setFormData({ ...formData, deliveryStyle: updated });
-                  }}
-                  className={`px-4 py-2 rounded-full border ${
-                    (formData.deliveryStyle || []).includes(style)
-                      ? 'bg-green-500 text-white border-green-500' 
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
-                  }`}
-                >
-                  {style}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-
-    case 6:
-      return (
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-xl font-semibold mb-2">🧩 6. How long should the session run?</h3>
-            <p className="text-gray-600 mb-4">How much time do you want to spend on this lesson?</p>
-            <div className="flex flex-wrap gap-2">
-              {sessionDurations.map(duration => (
-                <button
-                  key={duration}
-                  onClick={() => setFormData({ ...formData, duration })}
-                  className={`px-4 py-2 rounded-full border ${
-                    formData.duration === duration 
-                      ? 'bg-green-500 text-white border-green-500' 
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
-                  }`}
-                >
-                  {duration}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-
-    case 7:
-      return (
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-xl font-semibold mb-2">🧩 7. Are there specific challenges or scenarios you want to simulate?</h3>
-            <p className="text-gray-600 mb-4">Want me to focus on a tricky part of your workflow?</p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {getIndustryChallenges(formData.industry).map(challenge => (
-                <button
-                  key={challenge}
-                  onClick={() => setFormData({ ...formData, challenges: challenge })}
-                  className={`px-3 py-1 text-sm rounded-full border ${
-                    formData.challenges === challenge 
-                      ? 'bg-green-500 text-white border-green-500' 
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
-                  }`}
-                >
-                  {challenge}
-                </button>
-              ))}
-            </div>
+            <h3 className="text-xl font-semibold mb-2">Describe your learner</h3>
+            <p className="text-gray-600 mb-4">Who is this training for?</p>
             <textarea
-              placeholder="Or describe your specific challenge..."
-              value={formData.customChallenges || ''}
-              onChange={(e) => setFormData({ ...formData, customChallenges: e.target.value, challenges: e.target.value })}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-              rows={3}
+              value={formData.audience || ''}
+              onChange={(e) => setFormData({ ...formData, audience: e.target.value })}
+              placeholder="e.g., Investors, traders, finance enthusiasts, business students, professionals"
+              className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+              rows={4}
             />
+            {formData.industry && (
+              <div className="mt-3 p-3 bg-purple-50 rounded-lg">
+                <p className="text-sm text-purple-700">
+                  💡 For {formData.industry}, consider including: {getIndustryAudience(formData.industry).slice(0, 3).join(', ')}...
+                </p>
+              </div>
+            )}
           </div>
         </div>
       );
+
+
+
 
     default:
       return null;
