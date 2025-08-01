@@ -33,12 +33,12 @@ serve(async (req) => {
 
     console.log(`Normalized URL: ${normalizedUrl}`)
 
-    // Use Scrape Do API
+    // Use Scrape Do API with the correct format from your example
     const scrapeDoApiKey = '822a1b7e81f245e49efb58641832963e5b988f1322a'
+    const encodedUrl = encodeURIComponent(normalizedUrl)
+    const scrapeDoUrl = `http://api.scrape.do/?url=${encodedUrl}&token=${scrapeDoApiKey}`
     
-    const scrapeDoUrl = `https://api.scrape.do?token=${scrapeDoApiKey}&url=${encodeURIComponent(normalizedUrl)}&format=json&render=true`
-    
-    console.log('Calling Scrape Do API...')
+    console.log('Calling Scrape Do API with URL:', scrapeDoUrl)
     
     const response = await fetch(scrapeDoUrl, {
       method: 'GET',
@@ -58,11 +58,11 @@ serve(async (req) => {
     const scrapeData = await response.json()
     console.log('Scrape Do response received, processing...')
 
-    // Extract the HTML content
-    const html = scrapeData.body || scrapeData.html || ''
+    // The response should contain the HTML content
+    const html = scrapeData.body || scrapeData.html || scrapeData.content || ''
     
     if (!html) {
-      console.error('No HTML content in response:', scrapeData)
+      console.error('No HTML content in response:', Object.keys(scrapeData))
       throw new Error('No HTML content received from the website')
     }
 
@@ -121,7 +121,7 @@ serve(async (req) => {
         error: error.message || 'Failed to scrape website'
       }),
       {
-        status: 400, // Changed from 500 to 400 to avoid 5xx errors
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
