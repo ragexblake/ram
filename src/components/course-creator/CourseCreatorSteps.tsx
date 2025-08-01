@@ -1,9 +1,11 @@
 
 import React from 'react';
-import { Building2, GraduationCap, ArrowRight } from 'lucide-react';
+import { Building2, GraduationCap, ArrowRight, Info } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import CorporateStepRenderer from './CorporateStepRenderer';
 import EducationalStepRenderer from './EducationalStepRenderer';
+import ContentInputStepRenderer from './ContentInputStepRenderer';
+import CourseStructureStepRenderer from './CourseStructureStepRenderer';
 
 interface CourseCreatorStepsProps {
   selectedTrack: 'Corporate' | 'Educational';
@@ -26,31 +28,20 @@ const CourseCreatorSteps: React.FC<CourseCreatorStepsProps> = ({
   onCreateCourse,
   loading
 }) => {
-  const maxSteps = 7; // Both Corporate and Educational now have 7 steps
+  const maxSteps = 4; // Now both tracks have 4 steps
 
   const canProceed = () => {
-    if (selectedTrack === 'Corporate') {
-      switch (currentStep) {
-        case 1: return formData.industry;
-        case 2: return formData.goal;
-        case 3: return formData.audience;
-        case 4: return formData.skillLevel;
-        case 5: return formData.deliveryStyle && formData.deliveryStyle.length > 0;
-        case 6: return formData.duration;
-        case 7: return true; // Optional step
-        default: return false;
-      }
-    } else {
-      switch (currentStep) {
-        case 1: return formData.educationalLevel;
-        case 2: return formData.subject;
-        case 3: return formData.objective;
-        case 4: return formData.supportLevel;
-        case 5: return formData.sessionType && formData.sessionType.length > 0;
-        case 6: return formData.duration;
-        case 7: return true; // Optional step
-        default: return false;
-      }
+    switch (currentStep) {
+      case 1: 
+        return selectedTrack === 'Corporate' ? formData.industry : formData.educationalLevel;
+      case 2: 
+        return true; // Content input step is optional
+      case 3: 
+        return formData.audience && formData.audience.trim().length > 0;
+      case 4: 
+        return true; // Course structure step - all fields are optional with defaults
+      default: 
+        return false;
     }
   };
 
@@ -72,19 +63,59 @@ const CourseCreatorSteps: React.FC<CourseCreatorStepsProps> = ({
             <span className="text-sm text-gray-500">{Math.round((currentStep / maxSteps) * 100)}%</span>
           </div>
           <Progress value={(currentStep / maxSteps) * 100} className="h-2" />
+          
+          {/* Step Labels */}
+          <div className="flex justify-between mt-4 text-xs text-gray-500">
+            <span className={currentStep >= 1 ? 'text-purple-600 font-medium' : ''}>Course</span>
+            <span className={currentStep >= 2 ? 'text-purple-600 font-medium' : ''}>Upload</span>
+            <span className={currentStep >= 3 ? 'text-purple-600 font-medium' : ''}>Learner</span>
+            <span className={currentStep >= 4 ? 'text-purple-600 font-medium' : ''}>Outline</span>
+          </div>
+        </div>
+        
+        {/* Video Tutorial Link */}
+        <div className="flex justify-end mb-4">
+          <button className="flex items-center space-x-1 text-sm text-gray-500 hover:text-gray-700">
+            <Info className="h-4 w-4" />
+            <span>Video tutorial</span>
+          </button>
         </div>
       </div>
 
       <div className="bg-white rounded-lg p-8 shadow-sm border">
-        {selectedTrack === 'Corporate' ? (
+        {currentStep === 2 ? (
+          <ContentInputStepRenderer 
+            formData={formData} 
+            setFormData={setFormData} 
+          />
+        ) : currentStep === 3 ? (
+          selectedTrack === 'Corporate' ? (
+            <CorporateStepRenderer 
+              currentStep={3} 
+              formData={formData} 
+              setFormData={setFormData} 
+            />
+          ) : (
+            <EducationalStepRenderer 
+              currentStep={3} 
+              formData={formData} 
+              setFormData={setFormData} 
+            />
+          )
+        ) : currentStep === 4 ? (
+          <CourseStructureStepRenderer 
+            formData={formData} 
+            setFormData={setFormData} 
+          />
+        ) : selectedTrack === 'Corporate' ? (
           <CorporateStepRenderer 
-            currentStep={currentStep} 
+            currentStep={1} 
             formData={formData} 
             setFormData={setFormData} 
           />
         ) : (
           <EducationalStepRenderer 
-            currentStep={currentStep} 
+            currentStep={1} 
             formData={formData} 
             setFormData={setFormData} 
           />
