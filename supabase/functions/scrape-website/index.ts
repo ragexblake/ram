@@ -25,10 +25,18 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Normalize URL - add https if no protocol
+    let normalizedUrl = websiteUrl.trim()
+    if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+      normalizedUrl = 'https://' + normalizedUrl
+    }
+
+    console.log(`Normalized URL: ${normalizedUrl}`)
+
     // Use Scrape Do API
     const scrapeDoApiKey = '822a1b7e81f245e49efb58641832963e5b988f1322a'
     
-    const scrapeDoUrl = `https://api.scrape.do?token=${scrapeDoApiKey}&url=${encodeURIComponent(websiteUrl)}&format=json&render=true`
+    const scrapeDoUrl = `https://api.scrape.do?token=${scrapeDoApiKey}&url=${encodeURIComponent(normalizedUrl)}&format=json&render=true`
     
     console.log('Calling Scrape Do API...')
     
@@ -39,19 +47,26 @@ serve(async (req) => {
       }
     })
 
+    console.log(`Scrape Do API response status: ${response.status}`)
+
     if (!response.ok) {
-      throw new Error(`Scrape Do API error: ${response.status} ${response.statusText}`)
+      const errorText = await response.text()
+      console.error(`Scrape Do API error: ${response.status} ${response.statusText} - ${errorText}`)
+      throw new Error(`Failed to fetch website content: ${response.status} ${response.statusText}`)
     }
 
     const scrapeData = await response.json()
-    console.log('Scrape Do response received')
+    console.log('Scrape Do response received, processing...')
 
     // Extract the HTML content
     const html = scrapeData.body || scrapeData.html || ''
     
     if (!html) {
-      throw new Error('No HTML content received from Scrape Do API')
+      console.error('No HTML content in response:', scrapeData)
+      throw new Error('No HTML content received from the website')
     }
+
+    console.log(`HTML content length: ${html.length} characters`)
 
     // Check if this is a parking page
     if (isParkingPage(html)) {
@@ -59,16 +74,20 @@ serve(async (req) => {
     }
     
     // Extract key information from the HTML
-    const extractedData = extractKeyInformation(html, websiteUrl)
+    const extractedData = extractKeyInformation(html, normalizedUrl)
     
-    console.log('Extracted data:', extractedData)
+    console.log('Extracted data:', {
+      title: extractedData.title,
+      wordCount: extractedData.wordCount,
+      keywordsCount: extractedData.businessKeywords?.length || 0
+    })
 
     // Store the scraped content in the database
     const { error: upsertError } = await supabase
       .from('company_website_data')
       .upsert({
         user_id: userId,
-        website_url: websiteUrl,
+        website_url: normalizedUrl,
         scraped_content: extractedData,
         last_scraped_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -79,11 +98,14 @@ serve(async (req) => {
       throw new Error(`Failed to store scraped data: ${upsertError.message}`)
     }
 
+    console.log('Successfully stored scraped data in database')
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: 'Website scraped successfully',
-        extractedData
+        extractedData,
+        finalUrl: normalizedUrl
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -95,10 +117,11 @@ serve(async (req) => {
     console.error('Error in scrape-website function:', error)
     return new Response(
       JSON.stringify({ 
+        success: false,
         error: error.message || 'Failed to scrape website'
       }),
       {
-        status: 500,
+        status: 400, // Changed from 500 to 400 to avoid 5xx errors
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     )
@@ -113,7 +136,8 @@ function isParkingPage(html: string): boolean {
     'buy this domain',
     'domain for sale',
     'expired domain',
-    'coming soon'
+    'coming soon',
+    'under construction'
   ]
   
   const lowerHtml = html.toLowerCase()
@@ -168,7 +192,8 @@ function extractBusinessKeywords(text: string): string[] {
     'solutions', 'team', 'experience', 'expertise', 'industry', 'customers', 'clients',
     'innovation', 'technology', 'quality', 'excellence', 'professional', 'development',
     'training', 'consultation', 'support', 'partnership', 'collaboration', 'strategy',
-    'management', 'leadership', 'growth', 'success', 'results', 'performance'
+    'management', 'leadership', 'growth', 'success', 'results', 'performance',
+    'safety', 'security', 'compliance', 'efficiency', 'productivity', 'optimization'
   ]
 
   const foundTerms: string[] = []
@@ -179,7 +204,7 @@ function extractBusinessKeywords(text: string): string[] {
     }
   })
 
-  return foundTerms
+  return [...new Set(foundTerms)] // Remove duplicates
 }
 
 function extractCompanyTerms(html: string): string[] {

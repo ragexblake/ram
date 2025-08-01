@@ -45,37 +45,44 @@ const ContentInputStepRenderer: React.FC<ContentInputStepRendererProps> = ({
       console.log('Calling scrape-website function...');
       
       // Call the scrape-website function
-      const response = await supabase.functions.invoke('scrape-website', {
+      const { data, error } = await supabase.functions.invoke('scrape-website', {
         body: {
           websiteUrl: websiteUrl.trim(),
           userId: session.user.id
         }
       });
       
-      if (response.error) {
-        console.error('Scrape-website function error:', response.error)
-        throw new Error(response.error.message || 'Failed to scrape website')
+      if (error) {
+        console.error('Scrape-website function error:', error)
+        throw new Error(error.message || 'Failed to scrape website')
       }
 
-      console.log('Scrape response:', response);
+      console.log('Scrape response:', data);
 
-      if (response.data?.success) {
-        console.log('Scraping successful, extracted data:', response.data.extractedData);
+      if (data?.success) {
+        console.log('Scraping successful, extracted data:', data.extractedData);
         
         setFormData({ 
           ...formData, 
           contentSource: 'website',
           websiteUrl: websiteUrl.trim(),
-          contentData: response.data.extractedData,
+          contentData: data.extractedData,
           scrapedAt: new Date().toISOString()
         });
 
         toast({
           title: "Website Scraped Successfully",
-          description: `Successfully extracted content from ${websiteUrl}`,
+          description: data.finalUrl ? 
+            `Successfully extracted content from ${data.finalUrl}` : 
+            `Successfully extracted content from ${websiteUrl}`,
         });
+        
+        // Update URL if there was a redirect
+        if (data.finalUrl && data.finalUrl !== websiteUrl) {
+          setWebsiteUrl(data.finalUrl);
+        }
       } else {
-        console.error('No success flag in response:', response.data);
+        console.error('No success flag in response:', data);
         throw new Error('Failed to scrape website - no success response');
       }
     } catch (error: any) {
