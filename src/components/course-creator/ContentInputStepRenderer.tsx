@@ -52,43 +52,12 @@ const ContentInputStepRenderer: React.FC<ContentInputStepRendererProps> = ({
         }
       });
       
-      // If the function fails, try a fallback approach
       if (response.error) {
-        console.log('Supabase function failed, trying fallback...');
-        // For now, create a simple mock response for testing
-        const mockData = {
-          url: websiteUrl.trim(),
-          title: `Content from ${websiteUrl.trim()}`,
-          description: `Extracted content from ${websiteUrl.trim()}`,
-          mainContent: `This is a placeholder for content extracted from ${websiteUrl.trim()}. The actual scraping function needs to be deployed.`,
-          businessKeywords: ['content', 'website', 'information'],
-          companyTerms: ['website', 'content'],
-          navigationItems: ['Home', 'About', 'Contact'],
-          extractedAt: new Date().toISOString(),
-          wordCount: 50
-        };
-        
-        setFormData({ 
-          ...formData, 
-          contentSource: 'website',
-          websiteUrl: websiteUrl.trim(),
-          contentData: mockData,
-          scrapedAt: new Date().toISOString()
-        });
-
-        toast({
-          title: "Website Content Added (Mock)",
-          description: `Added placeholder content for ${websiteUrl}. Function deployment required for actual scraping.`,
-        });
-        return;
+        console.error('Scrape-website function error:', response.error)
+        throw new Error(response.error.message || 'Failed to scrape website')
       }
 
       console.log('Scrape response:', response);
-
-      if (response.error) {
-        console.error('Supabase function error:', response.error);
-        throw new Error(response.error.message);
-      }
 
       if (response.data?.success) {
         console.log('Scraping successful, extracted data:', response.data.extractedData);
@@ -103,7 +72,7 @@ const ContentInputStepRenderer: React.FC<ContentInputStepRendererProps> = ({
 
         toast({
           title: "Website Scraped Successfully",
-          description: `Successfully extracted content from ${response.data.finalUrl || websiteUrl}`,
+          description: `Successfully extracted content from ${websiteUrl}`,
         });
       } else {
         console.error('No success flag in response:', response.data);
@@ -124,58 +93,6 @@ const ContentInputStepRenderer: React.FC<ContentInputStepRendererProps> = ({
       });
     } finally {
       setIsCrawling(false);
-    }
-  };
-
-  // Test function to check if Supabase functions are working
-  const testSupabaseFunction = async () => {
-    try {
-      console.log('Testing Supabase function connection...');
-      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-      console.log('Supabase Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('Current session:', session);
-      
-      // First test if we can reach any Supabase function
-      try {
-        const testResponse = await supabase.functions.invoke('check-subscription', {
-          body: { userId: session?.user?.id || 'test-user' }
-        });
-        console.log('Basic function test response:', testResponse);
-      } catch (basicError) {
-        console.log('Basic function test failed:', basicError);
-      }
-      
-      const response = await supabase.functions.invoke('scrape-website', {
-        body: {
-          websiteUrl: 'https://example.com',
-          userId: session?.user?.id || 'test-user'
-        }
-      });
-      console.log('Test response:', response);
-      
-      if (response.error) {
-        console.error('Function error:', response.error);
-        toast({
-          title: "Function Test Failed",
-          description: response.error.message,
-          variant: "destructive",
-        });
-      } else {
-        console.log('Function test successful');
-        toast({
-          title: "Function Test Successful",
-          description: "Supabase function is working correctly",
-        });
-      }
-    } catch (error) {
-      console.error('Test function error:', error);
-      toast({
-        title: "Function Test Error",
-        description: error instanceof Error ? error.message : "Unknown error",
-        variant: "destructive",
-      });
     }
   };
 
@@ -345,17 +262,6 @@ const ContentInputStepRenderer: React.FC<ContentInputStepRendererProps> = ({
                       Fetch
                     </>
                   )}
-                </Button>
-              </div>
-              {/* Debug button - remove in production */}
-              <div className="mt-2">
-                <Button
-                  onClick={testSupabaseFunction}
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                >
-                  Test Function Connection
                 </Button>
               </div>
             </div>
