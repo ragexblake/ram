@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Upload, Globe, FileText, Info, Play } from 'lucide-react';
+import { Upload, Globe, FileText, Info, Play, Edit3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import ManualContentEditor from './ManualContentEditor';
 
 interface ContentInputStepRendererProps {
   formData: any;
@@ -15,7 +16,7 @@ const ContentInputStepRenderer: React.FC<ContentInputStepRendererProps> = ({
   formData,
   setFormData
 }) => {
-  const [activeTab, setActiveTab] = useState<'websites' | 'files'>('websites');
+  const [activeTab, setActiveTab] = useState<'websites' | 'files' | 'manual'>('websites');
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [isCrawling, setIsCrawling] = useState(false);
   const [isProcessingPdf, setIsProcessingPdf] = useState(false);
@@ -45,44 +46,43 @@ const ContentInputStepRenderer: React.FC<ContentInputStepRendererProps> = ({
       console.log('Calling scrape-website function...');
       
       // Call the scrape-website function
-      const { data, error } = await supabase.functions.invoke('scrape-website', {
+      const response = await supabase.functions.invoke('scrape-website', {
         body: {
           websiteUrl: websiteUrl.trim(),
           userId: session.user.id
         }
       });
       
-      if (error) {
-        console.error('Scrape-website function error:', error)
-        throw new Error(error.message || 'Failed to scrape website')
+      // If the function fails, show error
+      if (response.error) {
+        console.error('Supabase function error:', response.error);
+        throw new Error(response.error.message);
       }
 
-      console.log('Scrape response:', data);
+      console.log('Scrape response:', response);
 
-      if (data?.success) {
-        console.log('Scraping successful, extracted data:', data.extractedData);
+      if (response.error) {
+        console.error('Supabase function error:', response.error);
+        throw new Error(response.error.message);
+      }
+
+      if (response.data?.success) {
+        console.log('Scraping successful, extracted data:', response.data.extractedData);
         
         setFormData({ 
           ...formData, 
           contentSource: 'website',
           websiteUrl: websiteUrl.trim(),
-          contentData: data.extractedData,
+          contentData: response.data.extractedData,
           scrapedAt: new Date().toISOString()
         });
 
         toast({
           title: "Website Scraped Successfully",
-          description: data.finalUrl ? 
-            `Successfully extracted content from ${data.finalUrl}` : 
-            `Successfully extracted content from ${websiteUrl}`,
+          description: `Successfully extracted content from ${response.data.finalUrl || websiteUrl} using ScrapingBee API`,
         });
-        
-        // Update URL if there was a redirect
-        if (data.finalUrl && data.finalUrl !== websiteUrl) {
-          setWebsiteUrl(data.finalUrl);
-        }
       } else {
-        console.error('No success flag in response:', data);
+        console.error('No success flag in response:', response.data);
         throw new Error('Failed to scrape website - no success response');
       }
     } catch (error: any) {
@@ -95,11 +95,63 @@ const ContentInputStepRenderer: React.FC<ContentInputStepRendererProps> = ({
       
       toast({
         title: "Scraping Failed",
-        description: error.message || "Failed to scrape website content. Please check the URL and try again.",
+        description: error.message || "Failed to scrape website content via ScrapingBee API. Please check the URL and try again.",
         variant: "destructive",
       });
     } finally {
       setIsCrawling(false);
+    }
+  };
+
+  // Test function to check if Supabase functions are working
+  const testSupabaseFunction = async () => {
+    try {
+      console.log('Testing Supabase function connection...');
+      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+      console.log('Supabase Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Current session:', session);
+      
+      // First test if we can reach any Supabase function
+      try {
+        const testResponse = await supabase.functions.invoke('check-subscription', {
+          body: { userId: session?.user?.id || 'test-user' }
+        });
+        console.log('Basic function test response:', testResponse);
+      } catch (basicError) {
+        console.log('Basic function test failed:', basicError);
+      }
+      
+      const response = await supabase.functions.invoke('scrape-website', {
+        body: {
+          websiteUrl: 'https://example.com',
+          userId: session?.user?.id || 'test-user'
+        }
+      });
+      console.log('Test response:', response);
+      
+      if (response.error) {
+        console.error('Function error:', response.error);
+        toast({
+          title: "Function Test Failed",
+          description: response.error.message,
+          variant: "destructive",
+        });
+      } else {
+        console.log('Function test successful');
+        toast({
+          title: "Function Test Successful",
+          description: "Supabase function is working correctly",
+        });
+      }
+    } catch (error) {
+      console.error('Test function error:', error);
+      toast({
+        title: "Function Test Error",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
     }
   };
 
@@ -227,8 +279,8 @@ const ContentInputStepRenderer: React.FC<ContentInputStepRendererProps> = ({
         Provide existing content to help the AI generate more relevant and accurate course material.
       </p>
 
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'websites' | 'files')}>
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'websites' | 'files' | 'manual')}>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="websites" className="flex items-center space-x-2">
             <Globe className="h-4 w-4" />
             <span>Websites</span>
@@ -236,6 +288,10 @@ const ContentInputStepRenderer: React.FC<ContentInputStepRendererProps> = ({
           <TabsTrigger value="files" className="flex items-center space-x-2">
             <FileText className="h-4 w-4" />
             <span>Files</span>
+          </TabsTrigger>
+          <TabsTrigger value="manual" className="flex items-center space-x-2">
+            <Edit3 className="h-4 w-4" />
+            <span>Manual</span>
           </TabsTrigger>
         </TabsList>
 
@@ -269,6 +325,17 @@ const ContentInputStepRenderer: React.FC<ContentInputStepRendererProps> = ({
                       Fetch
                     </>
                   )}
+                </Button>
+              </div>
+              {/* Debug button - remove in production */}
+              <div className="mt-2">
+                <Button
+                  onClick={testSupabaseFunction}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                >
+                  Test Function Connection
                 </Button>
               </div>
             </div>
@@ -372,6 +439,13 @@ const ContentInputStepRenderer: React.FC<ContentInputStepRendererProps> = ({
               </div>
             )}
           </div>
+        </TabsContent>
+
+        <TabsContent value="manual" className="space-y-4">
+          <ManualContentEditor 
+            formData={formData} 
+            setFormData={setFormData} 
+          />
         </TabsContent>
       </Tabs>
 
