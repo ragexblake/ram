@@ -55,6 +55,8 @@ const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSessio
 
   const loadCourses = async () => {
     try {
+      console.log('Loading courses for admin user:', user.id);
+      
       // Fetch courses with their assignments
       const { data: coursesData, error: coursesError } = await supabase
         .from('courses')
@@ -63,6 +65,8 @@ const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSessio
         .order('created_at', { ascending: false });
 
       if (coursesError) throw coursesError;
+      
+      console.log('Fetched courses data:', coursesData);
 
       // Fetch assignments for all courses
       const { data: assignmentsData, error: assignmentsError } = await supabase
@@ -71,6 +75,8 @@ const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSessio
         .in('course_id', coursesData?.map(c => c.id) || []);
 
       if (assignmentsError) throw assignmentsError;
+      
+      console.log('Fetched assignments data:', assignmentsData);
 
       // Group assignments by course_id and extract unique teams
       const assignmentsByTourse = assignmentsData?.reduce((acc, assignment) => {
@@ -92,6 +98,7 @@ const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSessio
       })) || [];
 
       setCourses(coursesWithAssignments);
+      console.log('Final courses with assignments:', coursesWithAssignments);
     } catch (error) {
       console.error('Error loading courses:', error);
       toast({
@@ -228,6 +235,12 @@ const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSessio
       onReadCourse(course);
     }
   };
+  
+  const handleEditCourse = (course: any) => {
+    if (onEditCourse) {
+      onEditCourse(course);
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -254,13 +267,20 @@ const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSessio
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
+        <div className="text-center">
         <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          <p className="text-gray-500 mt-2">Loading your courses...</p>
+        </div>
       </div>
     );
   }
 
+  console.log('Rendering AdminCoursesView with courses:', courses.length);
   const draftedCourses = courses.filter(course => course.status === 'drafted' || course.status === 'processing');
   const publishedCourses = courses.filter(course => course.status === 'published');
+  
+  console.log('Drafted courses:', draftedCourses.length);
+  console.log('Published courses:', publishedCourses.length);
 
   const CourseCard = ({ course, isDraft = false }: { course: CourseWithAssignments; isDraft?: boolean }) => (
     <div className="bg-white border rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -433,6 +453,16 @@ const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSessio
                 <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No draft courses</h3>
                 <p className="text-gray-500">Create your first course using the Course Creator.</p>
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    <strong>Debug Info:</strong> Total courses found: {courses.length}
+                  </p>
+                  {courses.length > 0 && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      Course statuses: {courses.map(c => c.status).join(', ')}
+                    </p>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -454,6 +484,16 @@ const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSessio
                 <Globe className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No published courses</h3>
                 <p className="text-gray-500">Publish your draft courses to make them available for assignment.</p>
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    <strong>Debug Info:</strong> Total courses found: {courses.length}
+                  </p>
+                  {courses.length > 0 && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      Course statuses: {courses.map(c => c.status).join(', ')}
+                    </p>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
