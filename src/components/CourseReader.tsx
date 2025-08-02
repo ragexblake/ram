@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, CheckCircle, Circle, ArrowLeft, MoreHorizontal, Edit, Plus, Trash2, Save, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, CheckCircle, Circle, ArrowLeft, MoreHorizontal, Edit, Plus, Trash2, Save, X, RefreshCw, Eye, BookOpen, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import SimpleCourseEditor from './course-creator/SimpleCourseEditor';
 
 interface CourseReaderProps {
   course: any;
   user: any;
   onBack: () => void;
+  readOnly?: boolean;
+  onEditCourse?: () => void;
 }
 
 interface CourseSection {
@@ -33,7 +37,7 @@ interface QuizQuestion {
   correctAnswer: number;
 }
 
-const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => {
+const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack, readOnly = false }) => {
   const [courseContent, setCourseContent] = useState<CourseSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
@@ -55,18 +59,22 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
   const [newTopicContent, setNewTopicContent] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showAddSection, setShowAddSection] = useState(false);
+  const [newSectionTitle, setNewSectionTitle] = useState('');
+  const [newSectionDescription, setNewSectionDescription] = useState('');
+  const [activeTab, setActiveTab] = useState<'read' | 'edit'>('read');
   const { toast } = useToast();
 
   useEffect(() => {
     loadCourseContent();
   }, [course]);
 
-  const loadCourseContent = async () => {
+  const loadCourseContent = async (forceRegenerate = false) => {
     try {
       setLoading(true);
       
-      // First check if course already has generated content
-      if (course.course_plan?.courseContent) {
+      // First check if course already has generated content (unless forcing regeneration)
+      if (course.course_plan?.courseContent && !forceRegenerate) {
         console.log('Loading existing course content from database');
         setCourseContent(course.course_plan.courseContent.sections || course.course_plan.courseContent);
         setLoading(false);
@@ -134,141 +142,360 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
     const trackType = course.track_type || 'General';
     const courseTitle = course.course_title || 'Course';
     const goal = course.course_plan?.goal || 'learning objectives';
+    const industry = course.course_plan?.industry || 'General';
     
-    return [
-      {
-        id: "section-1",
-        title: "Introduction",
-        description: "Course overview and objectives",
-        subsections: [
-          {
-            id: "subsection-1-1",
-            title: "Welcome",
-            content: `
-              <h1>Welcome to ${courseTitle}</h1>
-              <p>This ${trackType.toLowerCase()} course is designed to help you achieve your learning goals.</p>
-              
-              <h2>Course Overview</h2>
-              <p>Throughout this course, you will:</p>
-              <ul>
-                <li><strong>Learn key concepts</strong> related to ${goal}</li>
-                <li><strong>Apply practical skills</strong> through interactive exercises</li>
-                <li><strong>Build confidence</strong> in your abilities</li>
-                <li><strong>Track your progress</strong> as you advance</li>
-              </ul>
-              
-              <h3>Getting Started</h3>
-              <p>Use the navigation on the left to move through the course sections. Each section builds upon the previous one, so we recommend following the order provided.</p>
-              
-              <p><em>Note: This is basic course content. For enhanced content generation, please ensure all system requirements are met.</em></p>
-            `
-          },
-          {
-            id: "subsection-1-2",
-            title: "Learning Objectives",
-            content: `
-              <h2>What You'll Achieve</h2>
-              <p>By the end of this course, you will have:</p>
-              
-              <ul>
-                <li>A solid understanding of core concepts</li>
-                <li>Practical skills you can apply immediately</li>
-                <li>Confidence to tackle real-world challenges</li>
-                <li>A foundation for continued learning</li>
-              </ul>
-              
-              <h3>Course Structure</h3>
-              <p>This course is organized into progressive sections that build upon each other:</p>
-              <ol>
-                <li><strong>Introduction</strong> - Overview and objectives</li>
-                <li><strong>Fundamentals</strong> - Core concepts and principles</li>
-                <li><strong>Application</strong> - Practical skills and exercises</li>
-                <li><strong>Mastery</strong> - Advanced topics and next steps</li>
-              </ol>
-            `,
-            hasQuiz: true
-          }
-        ]
-      },
-      {
-        id: "section-2",
-        title: "Fundamentals",
-        description: "Core concepts and principles",
-        subsections: [
-          {
-            id: "subsection-2-1",
-            title: "Key Concepts",
-            content: `
-              <h2>Understanding the Basics</h2>
-              <p>Let's start with the fundamental concepts that form the foundation of ${goal}.</p>
-              
-              <h3>Core Principles</h3>
-              <ul>
-                <li><strong>Principle 1:</strong> Understanding the fundamentals</li>
-                <li><strong>Principle 2:</strong> Applying knowledge effectively</li>
-                <li><strong>Principle 3:</strong> Continuous improvement</li>
-              </ul>
-              
-              <h3>Why This Matters</h3>
-              <p>These concepts are essential because they provide the framework for everything else you'll learn in this course.</p>
-            `
-          }
-        ]
-      },
-      {
-        id: "section-3",
-        title: "Application",
-        description: "Practical skills and real-world application",
-        subsections: [
-          {
-            id: "subsection-3-1",
-            title: "Practical Skills",
-            content: `
-              <h2>Putting Knowledge into Practice</h2>
-              <p>Now that you understand the fundamentals, let's explore how to apply these concepts in real situations.</p>
-              
-              <h3>Key Skills</h3>
-              <ul>
-                <li>Problem-solving techniques</li>
-                <li>Decision-making frameworks</li>
-                <li>Communication strategies</li>
-                <li>Implementation methods</li>
-              </ul>
-              
-              <h3>Real-World Examples</h3>
-              <p>Consider how these skills apply in your specific context and industry.</p>
-            `,
-            hasQuiz: true
-          }
-        ]
-      },
-      {
-        id: "section-4",
-        title: "Next Steps",
-        description: "Advanced topics and continued learning",
-        subsections: [
+    // Industry-specific section mappings
+    const industrySections = {
+      'Real Estate': [
         {
-          id: "subsection-4-1",
-          title: "Continued Learning",
-          content: `
-            <h2>Your Learning Journey Continues</h2>
-            <p>Congratulations on completing this course! Here's how to continue your development:</p>
-            
-            <h3>Next Steps</h3>
-            <ul>
-              <li><strong>Practice regularly:</strong> Apply what you've learned</li>
-              <li><strong>Seek feedback:</strong> Get input from others</li>
-              <li><strong>Stay updated:</strong> Keep learning new developments</li>
-              <li><strong>Share knowledge:</strong> Teach others what you've learned</li>
-            </ul>
-            
-            <h3>Additional Resources</h3>
-            <p>Consider exploring related courses and materials to deepen your expertise.</p>
-          `
+          title: "Real Estate Fundamentals",
+          description: "Core concepts and market understanding",
+          subsections: [
+            { title: "Market Dynamics", hasQuiz: false },
+            { title: "Property Types & Valuation", hasQuiz: true },
+            { title: "Legal Framework", hasQuiz: false },
+            { title: "Client Types & Needs", hasQuiz: true }
+          ]
+        },
+        {
+          title: "Sales Techniques & Objection Handling",
+          description: "Mastering client interactions",
+          subsections: [
+            { title: "Building Trust & Rapport", hasQuiz: false },
+            { title: "Handling Price Objections", hasQuiz: true },
+            { title: "Property Presentation Skills", hasQuiz: false },
+            { title: "Closing Strategies", hasQuiz: true }
+          ]
+        },
+        {
+          title: "Lead Generation & Management",
+          description: "Finding and nurturing prospects",
+          subsections: [
+            { title: "Lead Sources & Qualification", hasQuiz: false },
+            { title: "Follow-up Systems", hasQuiz: true },
+            { title: "CRM Best Practices", hasQuiz: false },
+            { title: "Referral Strategies", hasQuiz: true }
+          ]
+        },
+        {
+          title: "Professional Excellence",
+          description: "Building a successful real estate career",
+          subsections: [
+            { title: "Ethics & Compliance", hasQuiz: false },
+            { title: "Technology Integration", hasQuiz: true },
+            { title: "Market Analysis Skills", hasQuiz: false },
+            { title: "Career Development", hasQuiz: true }
+          ]
         }
+      ],
+      'SaaS': [
+        {
+          title: "SaaS Industry Fundamentals",
+          description: "Understanding the SaaS business model",
+          subsections: [
+            { title: "SaaS Business Model", hasQuiz: false },
+            { title: "Customer Lifecycle", hasQuiz: true },
+            { title: "Product-Market Fit", hasQuiz: false },
+            { title: "Competitive Landscape", hasQuiz: true }
+          ]
+        },
+        {
+          title: "Sales Process & Pipeline",
+          description: "Mastering SaaS sales methodology",
+          subsections: [
+            { title: "BANT Qualification", hasQuiz: false },
+            { title: "Demo Best Practices", hasQuiz: true },
+            { title: "Pricing Negotiations", hasQuiz: false },
+            { title: "Objection Handling", hasQuiz: true }
+          ]
+        },
+        {
+          title: "Customer Success & Retention",
+          description: "Ensuring long-term customer value",
+          subsections: [
+            { title: "Onboarding Strategies", hasQuiz: false },
+            { title: "Feature Adoption", hasQuiz: true },
+            { title: "Churn Prevention", hasQuiz: false },
+            { title: "Expansion Sales", hasQuiz: true }
+          ]
+        },
+        {
+          title: "Technology & Tools",
+          description: "Leveraging modern sales technology",
+          subsections: [
+            { title: "CRM & Sales Tools", hasQuiz: false },
+            { title: "Analytics & Reporting", hasQuiz: true },
+            { title: "Automation Strategies", hasQuiz: false },
+            { title: "AI in Sales", hasQuiz: true }
+          ]
+        }
+      ],
+             'Healthcare': [
+         {
+           title: "Healthcare Industry Fundamentals",
+           description: "Understanding healthcare delivery",
+           subsections: [
+             { title: "Healthcare Systems", hasQuiz: false },
+             { title: "Patient Care Models", hasQuiz: true },
+             { title: "Medical Terminology", hasQuiz: false },
+             { title: "Healthcare Regulations", hasQuiz: true }
+           ]
+         },
+         {
+           title: "Patient Communication",
+           description: "Effective patient interactions",
+           subsections: [
+             { title: "Bedside Manner", hasQuiz: false },
+             { title: "Procedure Explanations", hasQuiz: true },
+             { title: "Handling Patient Concerns", hasQuiz: false },
+             { title: "Family Communication", hasQuiz: true }
+           ]
+         },
+         {
+           title: "Clinical Skills & Safety",
+           description: "Professional healthcare delivery",
+           subsections: [
+             { title: "Safety Protocols", hasQuiz: false },
+             { title: "Infection Control", hasQuiz: true },
+             { title: "Emergency Procedures", hasQuiz: false },
+             { title: "Quality Assurance", hasQuiz: true }
+           ]
+         },
+         {
+           title: "Healthcare Technology",
+           description: "Modern healthcare tools and systems",
+           subsections: [
+             { title: "Electronic Health Records", hasQuiz: false },
+             { title: "Medical Devices", hasQuiz: true },
+             { title: "Telemedicine", hasQuiz: false },
+             { title: "Data Privacy", hasQuiz: true }
+           ]
+         }
+       ],
+       'Technology': [
+         {
+           title: "Technology Industry Fundamentals",
+           description: "Understanding the tech landscape",
+           subsections: [
+             { title: "Technology Trends", hasQuiz: false },
+             { title: "Product Development", hasQuiz: true },
+             { title: "Agile Methodologies", hasQuiz: false },
+             { title: "Innovation Strategies", hasQuiz: true }
+           ]
+         },
+         {
+           title: "Technical Skills & Development",
+           description: "Building technical expertise",
+           subsections: [
+             { title: "Programming Fundamentals", hasQuiz: false },
+             { title: "System Architecture", hasQuiz: true },
+             { title: "Quality Assurance", hasQuiz: false },
+             { title: "Performance Optimization", hasQuiz: true }
+           ]
+         },
+         {
+           title: "Team Collaboration",
+           description: "Working effectively in tech teams",
+           subsections: [
+             { title: "Code Review Practices", hasQuiz: false },
+             { title: "Pair Programming", hasQuiz: true },
+             { title: "Knowledge Sharing", hasQuiz: false },
+             { title: "Remote Collaboration", hasQuiz: true }
+           ]
+         },
+         {
+           title: "Career Growth in Tech",
+           description: "Advancing your technology career",
+           subsections: [
+             { title: "Skill Development", hasQuiz: false },
+             { title: "Certification Paths", hasQuiz: true },
+             { title: "Networking", hasQuiz: false },
+             { title: "Leadership in Tech", hasQuiz: true }
+           ]
+         }
+       ],
+       'Manufacturing': [
+         {
+           title: "Manufacturing Fundamentals",
+           description: "Understanding manufacturing processes",
+           subsections: [
+             { title: "Production Systems", hasQuiz: false },
+             { title: "Quality Control", hasQuiz: true },
+             { title: "Safety Protocols", hasQuiz: false },
+             { title: "Equipment Maintenance", hasQuiz: true }
+           ]
+         },
+         {
+           title: "Operational Excellence",
+           description: "Optimizing manufacturing operations",
+           subsections: [
+             { title: "Lean Manufacturing", hasQuiz: false },
+             { title: "Six Sigma", hasQuiz: true },
+             { title: "Inventory Management", hasQuiz: false },
+             { title: "Supply Chain", hasQuiz: true }
+           ]
+         },
+         {
+           title: "Team Leadership",
+           description: "Leading manufacturing teams",
+           subsections: [
+             { title: "Supervision Skills", hasQuiz: false },
+             { title: "Performance Management", hasQuiz: true },
+             { title: "Training Programs", hasQuiz: false },
+             { title: "Communication", hasQuiz: true }
+           ]
+         },
+         {
+           title: "Continuous Improvement",
+           description: "Driving manufacturing excellence",
+           subsections: [
+             { title: "Process Optimization", hasQuiz: false },
+             { title: "Technology Integration", hasQuiz: true },
+             { title: "Cost Reduction", hasQuiz: false },
+             { title: "Sustainability", hasQuiz: true }
+           ]
+         }
+       ]
+    };
+
+    // Get industry-specific sections or use generic ones
+    const sections = industrySections[industry] || [
+      {
+        title: "Industry Fundamentals",
+        description: "Understanding the industry landscape",
+        subsections: [
+          { title: "Industry Overview", hasQuiz: false },
+          { title: "Key Players & Stakeholders", hasQuiz: true },
+          { title: "Market Dynamics", hasQuiz: false },
+          { title: "Regulatory Environment", hasQuiz: true }
+        ]
+      },
+      {
+        title: "Professional Skills Development",
+        description: "Building core competencies",
+        subsections: [
+          { title: "Communication Skills", hasQuiz: false },
+          { title: "Problem-Solving Techniques", hasQuiz: true },
+          { title: "Leadership & Teamwork", hasQuiz: false },
+          { title: "Adaptability & Innovation", hasQuiz: true }
+        ]
+      },
+      {
+        title: "Practical Applications",
+        description: "Applying skills in real scenarios",
+        subsections: [
+          { title: "Client Interactions", hasQuiz: false },
+          { title: "Project Management", hasQuiz: true },
+          { title: "Performance Optimization", hasQuiz: false },
+          { title: "Quality Assurance", hasQuiz: true }
+        ]
+      },
+      {
+        title: "Advanced Strategies",
+        description: "Mastering advanced techniques",
+        subsections: [
+          { title: "Strategic Thinking", hasQuiz: false },
+          { title: "Complex Problem Solving", hasQuiz: true },
+          { title: "Continuous Improvement", hasQuiz: false },
+          { title: "Career Development", hasQuiz: true }
         ]
       }
     ];
+
+    // Generate content for each section and subsection
+    return sections.map((section, sectionIndex) => ({
+      id: `section-${sectionIndex + 1}`,
+      title: section.title,
+      description: section.description,
+      subsections: section.subsections.map((subsection, subsectionIndex) => ({
+        id: `subsection-${sectionIndex + 1}-${subsectionIndex + 1}`,
+        title: subsection.title,
+        content: generateSubsectionContent(subsection.title, goal, industry, courseTitle),
+        hasQuiz: subsection.hasQuiz
+      }))
+    }));
+  };
+
+  const generateSubsectionContent = (subsectionTitle: string, goal: string, industry: string, courseTitle: string) => {
+    const contentTemplates = {
+      "Market Dynamics": `
+        <h2>${subsectionTitle}</h2>
+        <p>Understanding market dynamics is crucial for success in the ${industry} industry. This section explores the key factors that influence market behavior and decision-making.</p>
+        
+        <h3>Key Market Factors</h3>
+        <ul>
+          <li><strong>Supply and Demand:</strong> Understanding market equilibrium</li>
+          <li><strong>Economic Indicators:</strong> Monitoring relevant economic data</li>
+          <li><strong>Seasonal Patterns:</strong> Identifying cyclical trends</li>
+          <li><strong>Competitive Forces:</strong> Analyzing market competition</li>
+        </ul>
+        
+        <h3>Market Analysis Tools</h3>
+        <p>Learn to use various tools and techniques to analyze market conditions and make informed decisions.</p>
+      `,
+      "Property Types & Valuation": `
+        <h2>${subsectionTitle}</h2>
+        <p>Master the fundamentals of property valuation and understand different property types in the real estate market.</p>
+        
+        <h3>Property Categories</h3>
+        <ul>
+          <li><strong>Residential:</strong> Single-family, multi-family, condominiums</li>
+          <li><strong>Commercial:</strong> Office, retail, industrial properties</li>
+          <li><strong>Land:</strong> Development opportunities and investment potential</li>
+          <li><strong>Specialty:</strong> Unique properties with specific characteristics</li>
+        </ul>
+        
+        <h3>Valuation Methods</h3>
+        <p>Learn the three main approaches to property valuation: sales comparison, income capitalization, and cost approach.</p>
+      `,
+      "SaaS Business Model": `
+        <h2>${subsectionTitle}</h2>
+        <p>Understand the unique characteristics of the Software-as-a-Service business model and how it differs from traditional software sales.</p>
+        
+        <h3>Key SaaS Characteristics</h3>
+        <ul>
+          <li><strong>Recurring Revenue:</strong> Subscription-based pricing models</li>
+          <li><strong>Scalability:</strong> Ability to serve multiple customers efficiently</li>
+          <li><strong>Customer Success:</strong> Focus on long-term customer value</li>
+          <li><strong>Product-Led Growth:</strong> Using the product to drive adoption</li>
+        </ul>
+        
+        <h3>Revenue Models</h3>
+        <p>Explore different SaaS pricing strategies including freemium, tiered pricing, and usage-based models.</p>
+      `,
+      "Healthcare Systems": `
+        <h2>${subsectionTitle}</h2>
+        <p>Explore the complex landscape of healthcare delivery systems and their impact on patient care.</p>
+        
+        <h3>System Components</h3>
+        <ul>
+          <li><strong>Providers:</strong> Hospitals, clinics, and healthcare professionals</li>
+          <li><strong>Payers:</strong> Insurance companies and government programs</li>
+          <li><strong>Regulators:</strong> Government agencies and oversight bodies</li>
+          <li><strong>Technology:</strong> Electronic health records and medical devices</li>
+        </ul>
+        
+        <h3>Care Delivery Models</h3>
+        <p>Learn about different approaches to healthcare delivery including fee-for-service, value-based care, and integrated systems.</p>
+      `
+    };
+
+    // Return specific content if available, otherwise generate generic content
+    return contentTemplates[subsectionTitle] || `
+      <h2>${subsectionTitle}</h2>
+      <p>This section focuses on ${subsectionTitle.toLowerCase()} within the context of ${goal} in the ${industry} industry.</p>
+      
+      <h3>Key Concepts</h3>
+      <ul>
+        <li><strong>Fundamental Principles:</strong> Core concepts and theories</li>
+        <li><strong>Practical Applications:</strong> Real-world implementation</li>
+        <li><strong>Best Practices:</strong> Industry-proven approaches</li>
+        <li><strong>Common Challenges:</strong> Typical obstacles and solutions</li>
+      </ul>
+      
+      <h3>Learning Objectives</h3>
+      <p>By the end of this section, you will understand how ${subsectionTitle.toLowerCase()} relates to your professional development in ${industry}.</p>
+    `;
   };
 
   const generateQuizQuestions = (sectionId: string, subsectionId: string): QuizQuestion[] => {
@@ -516,6 +743,32 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
     toast({
       title: "Topic Added",
       description: "New topic has been added to the course.",
+    });
+  };
+
+  const handleAddSection = () => {
+    if (!newSectionTitle.trim()) {
+      toast({
+        title: "Missing Title",
+        description: "Please provide a title for the new section.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const newSection = {
+      id: `section-${Date.now()}`,
+      title: newSectionTitle.trim(),
+      description: newSectionDescription.trim(),
+      subsections: [],
+    };
+    setCourseContent(prev => [...prev, newSection]);
+    setShowAddSection(false);
+    setNewSectionTitle('');
+    setNewSectionDescription('');
+    setHasUnsavedChanges(true);
+    toast({
+      title: "Section Added",
+      description: "New section has been added to the course.",
     });
   };
 
@@ -792,6 +1045,16 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
             />
           </div>
           <p className="text-xs text-gray-300">{progress}%</p>
+          {!readOnly && (
+            <button
+              onClick={() => loadCourseContent(true)}
+              disabled={loading}
+              className="mt-3 w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white text-xs py-2 px-3 rounded transition-colors"
+            >
+              <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+              <span>Regenerate Content</span>
+            </button>
+          )}
         </div>
 
         {/* Course Navigation */}
@@ -857,35 +1120,37 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
                           </span>
                         )}
                         
-                        {/* Edit and Delete buttons */}
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1 ml-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditSubsection(subsection);
-                            }}
-                            className="p-1 hover:bg-blue-100 rounded"
-                            title="Edit topic"
-                          >
-                            <Edit className="h-3 w-3 text-blue-600" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteSubsection(sectionIndex, subsectionIndex);
-                            }}
-                            className="p-1 hover:bg-red-100 rounded"
-                            title="Delete topic"
-                          >
-                            <Trash2 className="h-3 w-3 text-red-600" />
-                          </button>
-                        </div>
+                        {/* Edit and Delete buttons (hidden in readOnly mode) */}
+                        {!readOnly && (
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1 ml-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditSubsection(subsection);
+                              }}
+                              className="p-1 hover:bg-blue-100 rounded"
+                              title="Edit topic"
+                            >
+                              <Edit className="h-3 w-3 text-blue-600" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteSubsection(sectionIndex, subsectionIndex);
+                              }}
+                              className="p-1 hover:bg-red-100 rounded"
+                              title="Delete topic"
+                            >
+                              <Trash2 className="h-3 w-3 text-red-600" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
                   
-                  {/* Add Topic Button for current section */}
-                  {sectionIndex === currentSectionIndex && (
+                  {/* Add Topic Button for current section (hidden in readOnly mode) */}
+                  {sectionIndex === currentSectionIndex && !readOnly && (
                     <button
                       onClick={() => setShowAddTopic(true)}
                       className="w-full flex items-center justify-center p-3 text-blue-600 hover:bg-blue-50 border-t border-gray-200"
@@ -904,6 +1169,17 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
         <div className="p-4 border-t border-gray-200 bg-gray-50">
           <h4 className="font-semibold text-gray-800 mb-3">Course Management</h4>
           <div className="space-y-2">
+            {!readOnly && (
+              <Button
+                onClick={() => setShowAddSection(true)}
+                size="sm"
+                variant="outline"
+                className="w-full flex items-center justify-center space-x-2"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add New Section</span>
+              </Button>
+            )}
             {hasUnsavedChanges && (
               <Button
                 onClick={handleSaveChanges}
@@ -924,15 +1200,17 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
                 )}
               </Button>
             )}
-            <Button
-              onClick={() => setShowAddTopic(true)}
-              size="sm"
-              variant="outline"
-              className="w-full flex items-center justify-center space-x-2"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add New Topic</span>
-            </Button>
+            {!readOnly && (
+              <Button
+                onClick={() => setShowAddTopic(true)}
+                size="sm"
+                variant="outline"
+                className="w-full flex items-center justify-center space-x-2"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add New Topic</span>
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -980,7 +1258,38 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
         {/* Content Display */}
         <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
           <div className="max-w-4xl mx-auto">
-            {isEditing && editingSubsection ? (
+            {/* Tab Navigation */}
+            {!readOnly && (
+              <div className="mb-6">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'read' | 'edit')}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="read" className="flex items-center space-x-2">
+                      <BookOpen className="h-4 w-4" />
+                      <span>Read Course</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="edit" className="flex items-center space-x-2">
+                      <Edit3 className="h-4 w-4" />
+                      <span>Edit Content</span>
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+            )}
+
+            {/* Tab Content */}
+            {activeTab === 'edit' && !readOnly ? (
+              <SimpleCourseEditor
+                courseContent={courseContent}
+                onContentChange={(newContent) => {
+                  setCourseContent(newContent);
+                  setHasUnsavedChanges(true);
+                }}
+                onSave={handleSaveChanges}
+                readOnly={false}
+              />
+            ) : (
+              <>
+                {isEditing && editingSubsection ? (
               /* Edit Mode */
               <div className="bg-white rounded-lg shadow-lg border border-gray-200 min-h-[600px] p-8">
                 <div className="mb-6">
@@ -1100,6 +1409,8 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
           </div>
         </div>
       </div>
+    </>
+    )}
       
       {/* Add Topic Modal */}
       {showAddTopic && (
@@ -1147,6 +1458,55 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack }) => 
                 <Button onClick={handleAddTopic} className="flex items-center space-x-2">
                   <Plus className="h-4 w-4" />
                   <span>Add Topic</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Add Section Modal */}
+      {showAddSection && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-xl font-semibold mb-4">Add New Section</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Section Title
+                </label>
+                <Input
+                  value={newSectionTitle}
+                  onChange={(e) => setNewSectionTitle(e.target.value)}
+                  placeholder="Enter section title"
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description (optional)
+                </label>
+                <Textarea
+                  value={newSectionDescription}
+                  onChange={(e) => setNewSectionDescription(e.target.value)}
+                  placeholder="Enter section description"
+                  rows={3}
+                  className="w-full font-mono text-sm"
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <Button
+                  onClick={() => {
+                    setShowAddSection(false);
+                    setNewSectionTitle('');
+                    setNewSectionDescription('');
+                  }}
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleAddSection} className="flex items-center space-x-2">
+                  <Plus className="h-4 w-4" />
+                  <span>Add Section</span>
                 </Button>
               </div>
             </div>
