@@ -1,19 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Play, Pause, Volume2, VolumeX, CheckCircle, Circle, ArrowLeft, MoreHorizontal, Edit, Plus, Trash2, Save, X, RefreshCw, Eye, BookOpen, Settings } from 'lucide-react';
+import { ArrowLeft, BookOpen, ChevronRight, ChevronDown, Clock, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import SimpleCourseEditor from './course-creator/SimpleCourseEditor';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 interface CourseReaderProps {
   course: any;
   user: any;
   onBack: () => void;
   readOnly?: boolean;
-  onEditCourse?: () => void;
 }
 
 interface CourseSection {
@@ -27,516 +23,90 @@ interface CourseSubsection {
   id: string;
   title: string;
   content: string;
-  hasQuiz?: boolean;
+  hasQuiz: boolean;
 }
 
-interface QuizQuestion {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswer: number;
-}
-
-const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack, readOnly = false }) => {
+const CourseReader: React.FC<CourseReaderProps> = ({
+  course,
+  user,
+  onBack,
+  readOnly = true
+}) => {
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [courseContent, setCourseContent] = useState<CourseSection[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
-  const [currentSubsectionIndex, setCurrentSubsectionIndex] = useState(0);
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['section-1']));
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
-  const [showQuiz, setShowQuiz] = useState(false);
-  const [currentQuizAnswers, setCurrentQuizAnswers] = useState<{ [key: string]: number }>({});
-  const [quizResults, setQuizResults] = useState<{ [key: string]: boolean }>({});
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingSubsection, setEditingSubsection] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState('');
-  const [editTitle, setEditTitle] = useState('');
-  const [showAddTopic, setShowAddTopic] = useState(false);
-  const [newTopicTitle, setNewTopicTitle] = useState('');
-  const [newTopicContent, setNewTopicContent] = useState('');
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showAddSection, setShowAddSection] = useState(false);
-  const [newSectionTitle, setNewSectionTitle] = useState('');
-  const [newSectionDescription, setNewSectionDescription] = useState('');
-  const [activeTab, setActiveTab] = useState<'read' | 'edit'>('read');
-  const { toast } = useToast();
 
   useEffect(() => {
     loadCourseContent();
   }, [course]);
 
-  const loadCourseContent = async (forceRegenerate = false) => {
+  const loadCourseContent = () => {
     try {
-      setLoading(true);
+      // Extract course content from course plan
+      let content: CourseSection[] = [];
       
-      // First check if course already has generated content (unless forcing regeneration)
-      if (course.course_plan?.courseContent && !forceRegenerate) {
-        console.log('Loading existing course content from database');
-        setCourseContent(course.course_plan.courseContent.sections || course.course_plan.courseContent);
-        setLoading(false);
-        return;
-      }
-      
-      // If no existing content, generate new content
-      console.log('Generating new course content');
-      
-      // Add timeout to the function call
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 30000)
-      );
-      
-      const functionPromise = supabase.functions.invoke('generate-course-content', {
-        body: { course }
-      });
-      
-      const response = await Promise.race([functionPromise, timeoutPromise]);
-
-      if (response.error) {
-        console.error('Function invocation error:', response.error);
-        console.warn('Content generation failed, using fallback content');
-        const fallbackContent = createFallbackContent(course);
-        setCourseContent(fallbackContent);
-        
-        // Save the fallback content to database for future use
-        await saveCourseContentToDatabase(fallbackContent);
-        setLoading(false);
-        return;
-      }
-
-      if (response.data?.courseContent?.sections) {
-        const generatedContent = response.data.courseContent.sections;
-        setCourseContent(generatedContent);
-        
-        // Save the generated content to database for future use
-        await saveCourseContentToDatabase(generatedContent);
+      if (course.course_plan?.courseContent?.sections) {
+        content = course.course_plan.courseContent.sections;
+      } else if (course.course_plan?.sections) {
+        content = course.course_plan.sections;
+      } else if (Array.isArray(course.course_plan?.courseContent)) {
+        content = course.course_plan.courseContent;
       } else {
-        console.error('Invalid response structure:', response.data);
-        console.warn('Invalid response structure, using fallback content');
-        const fallbackContent = createFallbackContent(course);
-        setCourseContent(fallbackContent);
-        await saveCourseContentToDatabase(fallbackContent);
+        // Create basic structure from course plan if no structured content exists
+        content = createBasicStructure();
+      }
+      
+      setCourseContent(content);
+      
+      // Expand first section by default
+      if (content.length > 0) {
+        setExpandedSections(new Set([content[0].id]));
       }
     } catch (error) {
-      console.error('Error generating course content:', error);
-      
-      // Enhanced fallback content based on course data
-      const fallbackContent = createFallbackContent(course);
-      setCourseContent(fallbackContent);
-      
-      // Save fallback content to database
-      try {
-        await saveCourseContentToDatabase(fallbackContent);
-      } catch (saveError) {
-        console.error('Error saving fallback content:', saveError);
-      }
+      console.error('Error loading course content:', error);
+      setCourseContent(createBasicStructure());
     } finally {
       setLoading(false);
     }
   };
 
-  const createFallbackContent = (course: any): CourseSection[] => {
-    const trackType = course.track_type || 'General';
-    const courseTitle = course.course_title || 'Course';
-    const goal = course.course_plan?.goal || 'learning objectives';
-    const industry = course.course_plan?.industry || 'General';
+  const createBasicStructure = (): CourseSection[] => {
+    // Create a basic structure from available course data
+    const sections: CourseSection[] = [];
     
-    // Industry-specific section mappings
-    const industrySections = {
-      'Real Estate': [
+    // Introduction section
+    sections.push({
+      id: 'intro',
+      title: 'Introduction',
+      description: 'Course overview and objectives',
+      subsections: [
         {
-          title: "Real Estate Fundamentals",
-          description: "Core concepts and market understanding",
-          subsections: [
-            { title: "Market Dynamics", hasQuiz: false },
-            { title: "Property Types & Valuation", hasQuiz: true },
-            { title: "Legal Framework", hasQuiz: false },
-            { title: "Client Types & Needs", hasQuiz: true }
-          ]
-        },
-        {
-          title: "Sales Techniques & Objection Handling",
-          description: "Mastering client interactions",
-          subsections: [
-            { title: "Building Trust & Rapport", hasQuiz: false },
-            { title: "Handling Price Objections", hasQuiz: true },
-            { title: "Property Presentation Skills", hasQuiz: false },
-            { title: "Closing Strategies", hasQuiz: true }
-          ]
-        },
-        {
-          title: "Lead Generation & Management",
-          description: "Finding and nurturing prospects",
-          subsections: [
-            { title: "Lead Sources & Qualification", hasQuiz: false },
-            { title: "Follow-up Systems", hasQuiz: true },
-            { title: "CRM Best Practices", hasQuiz: false },
-            { title: "Referral Strategies", hasQuiz: true }
-          ]
-        },
-        {
-          title: "Professional Excellence",
-          description: "Building a successful real estate career",
-          subsections: [
-            { title: "Ethics & Compliance", hasQuiz: false },
-            { title: "Technology Integration", hasQuiz: true },
-            { title: "Market Analysis Skills", hasQuiz: false },
-            { title: "Career Development", hasQuiz: true }
-          ]
+          id: 'welcome',
+          title: 'Welcome',
+          content: `Welcome to ${course.course_title}!\n\nThis ${course.track_type} course is designed to help you achieve your learning objectives through interactive AI-powered tutoring.`,
+          hasQuiz: false
         }
-      ],
-      'SaaS': [
-        {
-          title: "SaaS Industry Fundamentals",
-          description: "Understanding the SaaS business model",
-          subsections: [
-            { title: "SaaS Business Model", hasQuiz: false },
-            { title: "Customer Lifecycle", hasQuiz: true },
-            { title: "Product-Market Fit", hasQuiz: false },
-            { title: "Competitive Landscape", hasQuiz: true }
-          ]
-        },
-        {
-          title: "Sales Process & Pipeline",
-          description: "Mastering SaaS sales methodology",
-          subsections: [
-            { title: "BANT Qualification", hasQuiz: false },
-            { title: "Demo Best Practices", hasQuiz: true },
-            { title: "Pricing Negotiations", hasQuiz: false },
-            { title: "Objection Handling", hasQuiz: true }
-          ]
-        },
-        {
-          title: "Customer Success & Retention",
-          description: "Ensuring long-term customer value",
-          subsections: [
-            { title: "Onboarding Strategies", hasQuiz: false },
-            { title: "Feature Adoption", hasQuiz: true },
-            { title: "Churn Prevention", hasQuiz: false },
-            { title: "Expansion Sales", hasQuiz: true }
-          ]
-        },
-        {
-          title: "Technology & Tools",
-          description: "Leveraging modern sales technology",
-          subsections: [
-            { title: "CRM & Sales Tools", hasQuiz: false },
-            { title: "Analytics & Reporting", hasQuiz: true },
-            { title: "Automation Strategies", hasQuiz: false },
-            { title: "AI in Sales", hasQuiz: true }
-          ]
-        }
-      ],
-             'Healthcare': [
-         {
-           title: "Healthcare Industry Fundamentals",
-           description: "Understanding healthcare delivery",
-           subsections: [
-             { title: "Healthcare Systems", hasQuiz: false },
-             { title: "Patient Care Models", hasQuiz: true },
-             { title: "Medical Terminology", hasQuiz: false },
-             { title: "Healthcare Regulations", hasQuiz: true }
-           ]
-         },
-         {
-           title: "Patient Communication",
-           description: "Effective patient interactions",
-           subsections: [
-             { title: "Bedside Manner", hasQuiz: false },
-             { title: "Procedure Explanations", hasQuiz: true },
-             { title: "Handling Patient Concerns", hasQuiz: false },
-             { title: "Family Communication", hasQuiz: true }
-           ]
-         },
-         {
-           title: "Clinical Skills & Safety",
-           description: "Professional healthcare delivery",
-           subsections: [
-             { title: "Safety Protocols", hasQuiz: false },
-             { title: "Infection Control", hasQuiz: true },
-             { title: "Emergency Procedures", hasQuiz: false },
-             { title: "Quality Assurance", hasQuiz: true }
-           ]
-         },
-         {
-           title: "Healthcare Technology",
-           description: "Modern healthcare tools and systems",
-           subsections: [
-             { title: "Electronic Health Records", hasQuiz: false },
-             { title: "Medical Devices", hasQuiz: true },
-             { title: "Telemedicine", hasQuiz: false },
-             { title: "Data Privacy", hasQuiz: true }
-           ]
-         }
-       ],
-       'Technology': [
-         {
-           title: "Technology Industry Fundamentals",
-           description: "Understanding the tech landscape",
-           subsections: [
-             { title: "Technology Trends", hasQuiz: false },
-             { title: "Product Development", hasQuiz: true },
-             { title: "Agile Methodologies", hasQuiz: false },
-             { title: "Innovation Strategies", hasQuiz: true }
-           ]
-         },
-         {
-           title: "Technical Skills & Development",
-           description: "Building technical expertise",
-           subsections: [
-             { title: "Programming Fundamentals", hasQuiz: false },
-             { title: "System Architecture", hasQuiz: true },
-             { title: "Quality Assurance", hasQuiz: false },
-             { title: "Performance Optimization", hasQuiz: true }
-           ]
-         },
-         {
-           title: "Team Collaboration",
-           description: "Working effectively in tech teams",
-           subsections: [
-             { title: "Code Review Practices", hasQuiz: false },
-             { title: "Pair Programming", hasQuiz: true },
-             { title: "Knowledge Sharing", hasQuiz: false },
-             { title: "Remote Collaboration", hasQuiz: true }
-           ]
-         },
-         {
-           title: "Career Growth in Tech",
-           description: "Advancing your technology career",
-           subsections: [
-             { title: "Skill Development", hasQuiz: false },
-             { title: "Certification Paths", hasQuiz: true },
-             { title: "Networking", hasQuiz: false },
-             { title: "Leadership in Tech", hasQuiz: true }
-           ]
-         }
-       ],
-       'Manufacturing': [
-         {
-           title: "Manufacturing Fundamentals",
-           description: "Understanding manufacturing processes",
-           subsections: [
-             { title: "Production Systems", hasQuiz: false },
-             { title: "Quality Control", hasQuiz: true },
-             { title: "Safety Protocols", hasQuiz: false },
-             { title: "Equipment Maintenance", hasQuiz: true }
-           ]
-         },
-         {
-           title: "Operational Excellence",
-           description: "Optimizing manufacturing operations",
-           subsections: [
-             { title: "Lean Manufacturing", hasQuiz: false },
-             { title: "Six Sigma", hasQuiz: true },
-             { title: "Inventory Management", hasQuiz: false },
-             { title: "Supply Chain", hasQuiz: true }
-           ]
-         },
-         {
-           title: "Team Leadership",
-           description: "Leading manufacturing teams",
-           subsections: [
-             { title: "Supervision Skills", hasQuiz: false },
-             { title: "Performance Management", hasQuiz: true },
-             { title: "Training Programs", hasQuiz: false },
-             { title: "Communication", hasQuiz: true }
-           ]
-         },
-         {
-           title: "Continuous Improvement",
-           description: "Driving manufacturing excellence",
-           subsections: [
-             { title: "Process Optimization", hasQuiz: false },
-             { title: "Technology Integration", hasQuiz: true },
-             { title: "Cost Reduction", hasQuiz: false },
-             { title: "Sustainability", hasQuiz: true }
-           ]
-         }
-       ]
-    };
+      ]
+    });
 
-    // Get industry-specific sections or use generic ones
-    const sections = industrySections[industry] || [
-      {
-        title: "Industry Fundamentals",
-        description: "Understanding the industry landscape",
+    // Main content section
+    if (course.course_plan?.goal) {
+      sections.push({
+        id: 'main',
+        title: 'Main Content',
+        description: 'Core learning material',
         subsections: [
-          { title: "Industry Overview", hasQuiz: false },
-          { title: "Key Players & Stakeholders", hasQuiz: true },
-          { title: "Market Dynamics", hasQuiz: false },
-          { title: "Regulatory Environment", hasQuiz: true }
+          {
+            id: 'objectives',
+            title: 'Learning Objectives',
+            content: `Goal: ${course.course_plan.goal}\n\n${course.course_plan.industry ? `Industry: ${course.course_plan.industry}\n\n` : ''}This course will guide you through practical applications and real-world scenarios to master the subject matter.`,
+            hasQuiz: false
+          }
         ]
-      },
-      {
-        title: "Professional Skills Development",
-        description: "Building core competencies",
-        subsections: [
-          { title: "Communication Skills", hasQuiz: false },
-          { title: "Problem-Solving Techniques", hasQuiz: true },
-          { title: "Leadership & Teamwork", hasQuiz: false },
-          { title: "Adaptability & Innovation", hasQuiz: true }
-        ]
-      },
-      {
-        title: "Practical Applications",
-        description: "Applying skills in real scenarios",
-        subsections: [
-          { title: "Client Interactions", hasQuiz: false },
-          { title: "Project Management", hasQuiz: true },
-          { title: "Performance Optimization", hasQuiz: false },
-          { title: "Quality Assurance", hasQuiz: true }
-        ]
-      },
-      {
-        title: "Advanced Strategies",
-        description: "Mastering advanced techniques",
-        subsections: [
-          { title: "Strategic Thinking", hasQuiz: false },
-          { title: "Complex Problem Solving", hasQuiz: true },
-          { title: "Continuous Improvement", hasQuiz: false },
-          { title: "Career Development", hasQuiz: true }
-        ]
-      }
-    ];
+      });
+    }
 
-    // Generate content for each section and subsection
-    return sections.map((section, sectionIndex) => ({
-      id: `section-${sectionIndex + 1}`,
-      title: section.title,
-      description: section.description,
-      subsections: section.subsections.map((subsection, subsectionIndex) => ({
-        id: `subsection-${sectionIndex + 1}-${subsectionIndex + 1}`,
-        title: subsection.title,
-        content: generateSubsectionContent(subsection.title, goal, industry, courseTitle),
-        hasQuiz: subsection.hasQuiz
-      }))
-    }));
-  };
-
-  const generateSubsectionContent = (subsectionTitle: string, goal: string, industry: string, courseTitle: string) => {
-    const contentTemplates = {
-      "Market Dynamics": `
-        <h2>${subsectionTitle}</h2>
-        <p>Understanding market dynamics is crucial for success in the ${industry} industry. This section explores the key factors that influence market behavior and decision-making.</p>
-        
-        <h3>Key Market Factors</h3>
-        <ul>
-          <li><strong>Supply and Demand:</strong> Understanding market equilibrium</li>
-          <li><strong>Economic Indicators:</strong> Monitoring relevant economic data</li>
-          <li><strong>Seasonal Patterns:</strong> Identifying cyclical trends</li>
-          <li><strong>Competitive Forces:</strong> Analyzing market competition</li>
-        </ul>
-        
-        <h3>Market Analysis Tools</h3>
-        <p>Learn to use various tools and techniques to analyze market conditions and make informed decisions.</p>
-      `,
-      "Property Types & Valuation": `
-        <h2>${subsectionTitle}</h2>
-        <p>Master the fundamentals of property valuation and understand different property types in the real estate market.</p>
-        
-        <h3>Property Categories</h3>
-        <ul>
-          <li><strong>Residential:</strong> Single-family, multi-family, condominiums</li>
-          <li><strong>Commercial:</strong> Office, retail, industrial properties</li>
-          <li><strong>Land:</strong> Development opportunities and investment potential</li>
-          <li><strong>Specialty:</strong> Unique properties with specific characteristics</li>
-        </ul>
-        
-        <h3>Valuation Methods</h3>
-        <p>Learn the three main approaches to property valuation: sales comparison, income capitalization, and cost approach.</p>
-      `,
-      "SaaS Business Model": `
-        <h2>${subsectionTitle}</h2>
-        <p>Understand the unique characteristics of the Software-as-a-Service business model and how it differs from traditional software sales.</p>
-        
-        <h3>Key SaaS Characteristics</h3>
-        <ul>
-          <li><strong>Recurring Revenue:</strong> Subscription-based pricing models</li>
-          <li><strong>Scalability:</strong> Ability to serve multiple customers efficiently</li>
-          <li><strong>Customer Success:</strong> Focus on long-term customer value</li>
-          <li><strong>Product-Led Growth:</strong> Using the product to drive adoption</li>
-        </ul>
-        
-        <h3>Revenue Models</h3>
-        <p>Explore different SaaS pricing strategies including freemium, tiered pricing, and usage-based models.</p>
-      `,
-      "Healthcare Systems": `
-        <h2>${subsectionTitle}</h2>
-        <p>Explore the complex landscape of healthcare delivery systems and their impact on patient care.</p>
-        
-        <h3>System Components</h3>
-        <ul>
-          <li><strong>Providers:</strong> Hospitals, clinics, and healthcare professionals</li>
-          <li><strong>Payers:</strong> Insurance companies and government programs</li>
-          <li><strong>Regulators:</strong> Government agencies and oversight bodies</li>
-          <li><strong>Technology:</strong> Electronic health records and medical devices</li>
-        </ul>
-        
-        <h3>Care Delivery Models</h3>
-        <p>Learn about different approaches to healthcare delivery including fee-for-service, value-based care, and integrated systems.</p>
-      `
-    };
-
-    // Return specific content if available, otherwise generate generic content
-    return contentTemplates[subsectionTitle] || `
-      <h2>${subsectionTitle}</h2>
-      <p>This section focuses on ${subsectionTitle.toLowerCase()} within the context of ${goal} in the ${industry} industry.</p>
-      
-      <h3>Key Concepts</h3>
-      <ul>
-        <li><strong>Fundamental Principles:</strong> Core concepts and theories</li>
-        <li><strong>Practical Applications:</strong> Real-world implementation</li>
-        <li><strong>Best Practices:</strong> Industry-proven approaches</li>
-        <li><strong>Common Challenges:</strong> Typical obstacles and solutions</li>
-      </ul>
-      
-      <h3>Learning Objectives</h3>
-      <p>By the end of this section, you will understand how ${subsectionTitle.toLowerCase()} relates to your professional development in ${industry}.</p>
-    `;
-  };
-
-  const generateQuizQuestions = (sectionId: string, subsectionId: string): QuizQuestion[] => {
-    const currentSection = courseContent[currentSectionIndex];
-    const currentSubsection = currentSection?.subsections[currentSubsectionIndex];
-    
-    return [
-      {
-        id: 'q1',
-        question: `What is the main focus of "${currentSubsection?.title}"?`,
-        options: [
-          'Understanding basic concepts',
-          'Advanced implementation',
-          'Historical background',
-          'Future predictions'
-        ],
-        correctAnswer: 0
-      },
-      {
-        id: 'q2',
-        question: 'Which approach is most effective for learning?',
-        options: [
-          'Memorizing facts only',
-          'Practical application and understanding',
-          'Skipping difficult topics',
-          'Reading without practice'
-        ],
-        correctAnswer: 1
-      },
-      {
-        id: 'q3',
-        question: 'What should you do when facing challenges?',
-        options: [
-          'Give up immediately',
-          'Skip to easier topics',
-          'Take time to understand and practice',
-          'Ignore the difficulty'
-        ],
-        correctAnswer: 2
-      }
-    ];
+    return sections;
   };
 
   const toggleSection = (sectionId: string) => {
@@ -549,970 +119,231 @@ const CourseReader: React.FC<CourseReaderProps> = ({ course, user, onBack, readO
     setExpandedSections(newExpanded);
   };
 
-  const navigateToSection = (sectionIndex: number, subsectionIndex: number = 0) => {
-    setCurrentSectionIndex(sectionIndex);
-    setCurrentSubsectionIndex(subsectionIndex);
-    setShowQuiz(false);
-    
-    // Auto-expand the selected section
-    const section = courseContent[sectionIndex];
-    if (section) {
-      const newExpanded = new Set(expandedSections);
-      newExpanded.add(section.id);
-      setExpandedSections(newExpanded);
-    }
+  const formatContent = (content: string) => {
+    // Convert simple text formatting to HTML
+    return content
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br/>');
   };
 
-  const navigateNext = () => {
-    const currentSection = courseContent[currentSectionIndex];
-    
-    if (currentSection?.subsections && currentSubsectionIndex < currentSection.subsections.length - 1) {
-      setCurrentSubsectionIndex(currentSubsectionIndex + 1);
-    } else if (currentSectionIndex < courseContent.length - 1) {
-      setCurrentSectionIndex(currentSectionIndex + 1);
-      setCurrentSubsectionIndex(0);
-    }
-    setShowQuiz(false);
-  };
-
-  const navigatePrevious = () => {
-    if (showQuiz) {
-      setShowQuiz(false);
-      return;
-    }
-    
-    if (currentSubsectionIndex > 0) {
-      setCurrentSubsectionIndex(currentSubsectionIndex - 1);
-    } else if (currentSectionIndex > 0) {
-      const prevSection = courseContent[currentSectionIndex - 1];
-      setCurrentSectionIndex(currentSectionIndex - 1);
-      setCurrentSubsectionIndex(prevSection.subsections ? prevSection.subsections.length - 1 : 0);
-    }
-  };
-
-  const markAsCompleted = (itemId: string) => {
-    const newCompleted = new Set(completedItems);
-    if (newCompleted.has(itemId)) {
-      newCompleted.delete(itemId);
-    } else {
-      newCompleted.add(itemId);
-    }
-    setCompletedItems(newCompleted);
-    
-    // Update progress
-    const totalItems = courseContent.reduce((total, section) => {
-      return total + (section.subsections ? section.subsections.length : 1);
-    }, 0);
-    const completedCount = newCompleted.size;
-    setProgress(Math.round((completedCount / totalItems) * 100));
-  };
-
-  const getCurrentContent = () => {
-    const currentSection = courseContent[currentSectionIndex];
-    if (currentSection?.subsections && currentSection.subsections[currentSubsectionIndex]) {
-      return {
-        title: currentSection.subsections[currentSubsectionIndex].title,
-        content: currentSection.subsections[currentSubsectionIndex].content,
-        hasQuiz: currentSection.subsections[currentSubsectionIndex].hasQuiz
-      };
-    }
-    return {
-      title: currentSection?.title || 'Loading...',
-      content: currentSection?.subsections?.[0]?.content || '<p>Loading content...</p>',
-      hasQuiz: false
-    };
-  };
-
-  const handleQuizAnswer = (questionId: string, answerIndex: number) => {
-    setCurrentQuizAnswers(prev => ({
-      ...prev,
-      [questionId]: answerIndex
-    }));
-  };
-
-  const submitQuiz = () => {
-    const questions = generateQuizQuestions(currentSectionIndex.toString(), currentSubsectionIndex.toString());
-    const results: { [key: string]: boolean } = {};
-    
-    questions.forEach(question => {
-      const userAnswer = currentQuizAnswers[question.id];
-      results[question.id] = userAnswer === question.correctAnswer;
-    });
-    
-    setQuizResults(results);
-    
-    // Mark current item as completed if quiz passed
-    const passedQuiz = Object.values(results).filter(Boolean).length >= Math.ceil(questions.length * 0.7);
-    if (passedQuiz) {
-      const currentSection = courseContent[currentSectionIndex];
-      const itemId = currentSection?.subsections 
-        ? currentSection.subsections[currentSubsectionIndex].id
-        : currentSection?.id;
-      if (itemId) {
-        markAsCompleted(itemId);
-      }
-    }
-  };
-
-  const handleEditSubsection = (subsection: CourseSubsection) => {
-    setEditingSubsection(subsection.id);
-    setEditTitle(subsection.title);
-    setEditContent(subsection.content);
-    setIsEditing(true);
-  };
-
-  const handleSaveEdit = () => {
-    setCourseContent(prev => prev.map(section => ({
-      ...section,
-      subsections: section.subsections.map(sub => 
-        sub.id === editingSubsection 
-          ? { ...sub, title: editTitle, content: editContent }
-          : sub
-      )
-    })));
-    
-    setIsEditing(false);
-    setEditingSubsection(null);
-    setEditTitle('');
-    setEditContent('');
-    setHasUnsavedChanges(true);
-    
-    toast({
-      title: "Content Updated",
-      description: "The course content has been updated successfully.",
-    });
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setEditingSubsection(null);
-    setEditTitle('');
-    setEditContent('');
-  };
-
-  const handleDeleteSubsection = (sectionIndex: number, subsectionIndex: number) => {
-    if (confirm('Are you sure you want to delete this topic?')) {
-      setCourseContent(prev => prev.map((section, sIdx) => 
-        sIdx === sectionIndex 
-          ? {
-              ...section,
-              subsections: section.subsections.filter((_, subIdx) => subIdx !== subsectionIndex)
-            }
-          : section
-      ));
-      setHasUnsavedChanges(true);
-      
-      toast({
-        title: "Topic Deleted",
-        description: "The topic has been removed from the course.",
-      });
-    }
-  };
-
-  const handleAddTopic = () => {
-    if (!newTopicTitle.trim() || !newTopicContent.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please provide both title and content for the new topic.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const newSubsection: CourseSubsection = {
-      id: `subsection-${Date.now()}`,
-      title: newTopicTitle.trim(),
-      content: newTopicContent.trim(),
-      hasQuiz: false
-    };
-
-    setCourseContent(prev => prev.map((section, sIdx) => 
-      sIdx === currentSectionIndex 
-        ? {
-            ...section,
-            subsections: [...section.subsections, newSubsection]
-          }
-        : section
-    ));
-
-    setShowAddTopic(false);
-    setNewTopicTitle('');
-    setNewTopicContent('');
-    setHasUnsavedChanges(true);
-    
-    toast({
-      title: "Topic Added",
-      description: "New topic has been added to the course.",
-    });
-  };
-
-  const handleAddSection = () => {
-    if (!newSectionTitle.trim()) {
-      toast({
-        title: "Missing Title",
-        description: "Please provide a title for the new section.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const newSection = {
-      id: `section-${Date.now()}`,
-      title: newSectionTitle.trim(),
-      description: newSectionDescription.trim(),
-      subsections: [],
-    };
-    setCourseContent(prev => [...prev, newSection]);
-    setShowAddSection(false);
-    setNewSectionTitle('');
-    setNewSectionDescription('');
-    setHasUnsavedChanges(true);
-    toast({
-      title: "Section Added",
-      description: "New section has been added to the course.",
-    });
-  };
-
-  const saveCourseContentToDatabase = async (content: CourseSection[]) => {
-    try {
-      setIsSaving(true);
-      
-      const { error } = await supabase
-        .from('courses')
-        .update({
-          course_plan: {
-            ...course.course_plan,
-            courseContent: { sections: content }
-          },
-        })
-        .eq('id', course.id);
-
-      if (error) throw error;
-
-      console.log('Course content saved successfully');
-      return true;
-    } catch (error) {
-      console.error('Error saving course content:', error);
-      throw error;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleSaveChanges = async () => {
-    try {
-      setIsSaving(true);
-      await saveCourseContentToDatabase(courseContent);
-      setHasUnsavedChanges(false);
-      
-      toast({
-        title: "Changes Saved",
-        description: "Your course content has been saved successfully.",
-      });
-    } catch (error) {
-      console.error('Error saving changes:', error);
-      toast({
-        title: "Save Failed",
-        description: "Failed to save changes. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
   if (loading) {
     return (
-      <div className="flex h-screen bg-gray-100 items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <div className="text-gray-600">Generating course content...</div>
-        </div>
-      </div>
-    );
-  }
-
-  const currentContent = getCurrentContent();
-
-  const canNavigatePrevious = currentSectionIndex > 0 || currentSubsectionIndex > 0 || showQuiz;
-  const canNavigateNext = currentSectionIndex < courseContent.length - 1 || 
-    (courseContent[currentSectionIndex]?.subsections && 
-     currentSubsectionIndex < courseContent[currentSectionIndex].subsections.length - 1);
-
-  if (showQuiz) {
-    const questions = generateQuizQuestions(currentSectionIndex.toString(), currentSubsectionIndex.toString());
-    const hasResults = Object.keys(quizResults).length > 0;
-    
-    return (
-      <div className="flex h-screen bg-gray-100">
-        {/* Sidebar Navigation */}
-        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-          <div className="p-4 border-b border-gray-200">
-            <button
-              onClick={onBack}
-              className="flex items-center text-gray-600 hover:text-gray-800 mb-3"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Course landing page
-            </button>
-            <h2 className="font-semibold text-gray-900 text-sm">{course.course_title}</h2>
-            <div className="mt-2 bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <p className="text-xs text-gray-500 mt-1">{progress}%</p>
-          </div>
-          
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-blue-900 mb-2">Quiz in Progress</h3>
-              <p className="text-sm text-blue-700">
-                {currentContent.title} - Knowledge Check
-              </p>
-            </div>
-            
-            {/* Course Editing Options */}
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold text-gray-800 mb-3">Course Management</h4>
-              <div className="space-y-2">
-                <Button
-                  onClick={() => setShowAddTopic(true)}
-                  size="sm"
-                  className="w-full flex items-center justify-center space-x-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Add New Topic</span>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quiz Content */}
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
-            <div className="max-w-4xl mx-auto">
-              <div className="bg-white rounded-lg shadow-lg border border-gray-200 min-h-[600px]">
-                <div className="p-8">
-                  <h1 className="text-2xl font-bold text-gray-900 mb-6">
-                    Knowledge Check: {currentContent.title}
-                  </h1>
-                  
-                  {!hasResults ? (
-                    <div className="space-y-6">
-                      {questions.map((question, index) => (
-                        <div key={question.id} className="border-b border-gray-200 pb-6 last:border-b-0">
-                          <h3 className="text-lg font-medium text-gray-900 mb-4">
-                            {index + 1}. {question.question}
-                          </h3>
-                          <div className="space-y-2">
-                            {question.options.map((option, optionIndex) => (
-                              <label key={optionIndex} className="flex items-center space-x-3 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name={question.id}
-                                  value={optionIndex}
-                                  checked={currentQuizAnswers[question.id] === optionIndex}
-                                  onChange={() => handleQuizAnswer(question.id, optionIndex)}
-                                  className="w-4 h-4 text-blue-600"
-                                />
-                                <span className="text-gray-700">{option}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                      
-                      <div className="pt-6">
-                        <Button
-                          onClick={submitQuiz}
-                          disabled={Object.keys(currentQuizAnswers).length < questions.length}
-                          className="bg-blue-600 hover:bg-blue-700"
-                        >
-                          Submit Quiz
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <h3 className="text-lg font-semibold text-green-800 mb-2">Quiz Results</h3>
-                        <p className="text-green-700">
-                          You scored {Object.values(quizResults).filter(Boolean).length} out of {questions.length}
-                        </p>
-                      </div>
-                      
-                      {questions.map((question, index) => {
-                        const userAnswer = currentQuizAnswers[question.id];
-                        const isCorrect = quizResults[question.id];
-                        
-                        return (
-                          <div key={question.id} className="border-b border-gray-200 pb-6 last:border-b-0">
-                            <h3 className="text-lg font-medium text-gray-900 mb-4">
-                              {index + 1}. {question.question}
-                            </h3>
-                            <div className="space-y-2">
-                              {question.options.map((option, optionIndex) => {
-                                const isUserAnswer = userAnswer === optionIndex;
-                                const isCorrectAnswer = optionIndex === question.correctAnswer;
-                                
-                                let className = "flex items-center space-x-3 p-2 rounded";
-                                if (isCorrectAnswer) {
-                                  className += " bg-green-100 border border-green-300";
-                                } else if (isUserAnswer && !isCorrect) {
-                                  className += " bg-red-100 border border-red-300";
-                                }
-                                
-                                return (
-                                  <div key={optionIndex} className={className}>
-                                    <div className="w-4 h-4 flex items-center justify-center">
-                                      {isCorrectAnswer && <CheckCircle className="h-4 w-4 text-green-600" />}
-                                      {isUserAnswer && !isCorrect && <Circle className="h-4 w-4 text-red-600" />}
-                                    </div>
-                                    <span className="text-gray-700">{option}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      
-                      <div className="pt-6">
-                        <Button
-                          onClick={() => {
-                            setShowQuiz(false);
-                            setCurrentQuizAnswers({});
-                            setQuizResults({});
-                          }}
-                          className="bg-blue-600 hover:bg-blue-700"
-                        >
-                          Continue Learning
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            {/* Course Management Section */}
-            {hasUnsavedChanges && (
-              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <Button
-                  onClick={handleSaveChanges}
-                  disabled={isSaving}
-                  size="sm"
-                  className="w-full bg-green-600 hover:bg-green-700 text-white"
-                >
-                  {isSaving ? (
-                    <>
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-3 w-3 mr-2" />
-                      Save Changes
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-          </div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <div className="text-gray-600">Loading course content...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar Navigation */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b border-gray-200 bg-gray-800 text-white">
-          <button
-            onClick={onBack}
-            className="flex items-center text-gray-300 hover:text-white mb-3"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Course landing page
-          </button>
-          <div className="bg-gray-700 rounded-full h-2 mb-2">
-            <div 
-              className="bg-white h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <p className="text-xs text-gray-300">{progress}%</p>
-          {!readOnly && (
-            <button
-              onClick={() => loadCourseContent(true)}
-              disabled={loading}
-              className="mt-3 w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white text-xs py-2 px-3 rounded transition-colors"
-            >
-              <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-              <span>Regenerate Content</span>
-            </button>
-          )}
-        </div>
-
-        {/* Course Navigation */}
-        <div className="flex-1 overflow-y-auto">
-          {courseContent.map((section, sectionIndex) => (
-            <div key={section.id} className="border-b border-gray-100">
-              <button
-                onClick={() => toggleSection(section.id)}
-                className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50"
-              >
-                <div className="flex items-center">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-sm font-medium mr-3 ${
-                    sectionIndex === currentSectionIndex ? 'bg-blue-600' : 'bg-gray-400'
-                  }`}>
-                    {sectionIndex + 1}
-                  </div>
-                  <span className={`text-sm ${sectionIndex === currentSectionIndex ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
-                    {section.title}
-                  </span>
-                </div>
-                {expandedSections.has(section.id) ? (
-                  <ChevronUp className="h-4 w-4 text-gray-400" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 text-gray-400" />
-                )}
-              </button>
-
-              {expandedSections.has(section.id) && section.subsections && (
-                <div className="bg-gray-50">
-                  {section.subsections.map((subsection, subsectionIndex) => (
-                    <div key={subsection.id} className="group">
-                      <div
-                        onClick={() => navigateToSection(sectionIndex, subsectionIndex)}
-                        className={`w-full flex items-center p-3 pl-12 text-left hover:bg-gray-100 cursor-pointer ${
-                          sectionIndex === currentSectionIndex && subsectionIndex === currentSubsectionIndex
-                            ? 'bg-blue-900 text-white'
-                            : ''
-                        }`}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markAsCompleted(subsection.id);
-                          }}
-                          className="mr-3"
-                        >
-                          {completedItems.has(subsection.id) ? (
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <Circle className="h-4 w-4 text-gray-400" />
-                          )}
-                        </button>
-                        <span className={`text-sm flex-1 ${
-                          sectionIndex === currentSectionIndex && subsectionIndex === currentSubsectionIndex
-                            ? 'font-medium text-white'
-                            : 'text-gray-600'
-                        }`}>
-                          {subsection.title}
-                        </span>
-                        {subsection.hasQuiz && (
-                          <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded ml-2">
-                            Quiz
-                          </span>
-                        )}
-                        
-                        {/* Edit and Delete buttons (hidden in readOnly mode) */}
-                        {!readOnly && (
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1 ml-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditSubsection(subsection);
-                              }}
-                              className="p-1 hover:bg-blue-100 rounded"
-                              title="Edit topic"
-                            >
-                              <Edit className="h-3 w-3 text-blue-600" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteSubsection(sectionIndex, subsectionIndex);
-                              }}
-                              className="p-1 hover:bg-red-100 rounded"
-                              title="Delete topic"
-                            >
-                              <Trash2 className="h-3 w-3 text-red-600" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {/* Add Topic Button for current section (hidden in readOnly mode) */}
-                  {sectionIndex === currentSectionIndex && !readOnly && (
-                    <button
-                      onClick={() => setShowAddTopic(true)}
-                      className="w-full flex items-center justify-center p-3 text-blue-600 hover:bg-blue-50 border-t border-gray-200"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      <span className="text-sm">Add Topic to This Section</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        
-        {/* Course Management Section */}
-        <div className="p-4 border-t border-gray-200 bg-gray-50">
-          <h4 className="font-semibold text-gray-800 mb-3">Course Management</h4>
-          <div className="space-y-2">
-            {!readOnly && (
-              <Button
-                onClick={() => setShowAddSection(true)}
-                size="sm"
-                variant="outline"
-                className="w-full flex items-center justify-center space-x-2"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add New Section</span>
-              </Button>
-            )}
-            {hasUnsavedChanges && (
-              <Button
-                onClick={handleSaveChanges}
-                disabled={isSaving}
-                size="sm"
-                className="w-full bg-green-600 hover:bg-green-700 text-white mb-2"
-              >
-                {isSaving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-3 w-3 mr-2" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
-            )}
-            {!readOnly && (
-              <Button
-                onClick={() => setShowAddTopic(true)}
-                size="sm"
-                variant="outline"
-                className="w-full flex items-center justify-center space-x-2"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add New Topic</span>
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Audio Player Bar */}
-        <div className="bg-white border-b border-gray-200 p-4">
-          <div className="flex items-center justify-between max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
               <Button
                 variant="ghost"
-                size="sm"
-                onClick={() => setIsPlaying(!isPlaying)}
+                onClick={onBack}
                 className="flex items-center space-x-2"
               >
-                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                <span className="text-sm">0:00 / 1:00</span>
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back</span>
               </Button>
-              
-              <div className="flex-1 max-w-md">
-                <div className="bg-gray-200 rounded-full h-1">
-                  <div className="bg-blue-600 h-1 rounded-full" style={{ width: '0%' }} />
-                </div>
+              <div className="h-6 w-px bg-gray-300"></div>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">
+                  {course.course_title}
+                </h1>
+                <p className="text-sm text-gray-600">
+                  {course.track_type} Course
+                </p>
               </div>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsMuted(!isMuted)}
-              >
-                {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-              </Button>
             </div>
             
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500">Read Audio</span>
-              <Button variant="ghost" size="sm">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
+            <div className="flex items-center space-x-3">
+              <Badge variant="outline" className="flex items-center space-x-1">
+                <BookOpen className="h-3 w-3" />
+                <span>{courseContent.length} Sections</span>
+              </Badge>
+              <Badge variant="outline" className="flex items-center space-x-1">
+                <User className="h-3 w-3" />
+                <span>Read Mode</span>
+              </Badge>
             </div>
-          </div>
-        </div>
-
-        {/* Content Display */}
-        <div className="flex-1 overflow-y-auto bg-gray-100 p-6">
-          <div className="max-w-4xl mx-auto">
-            {/* Tab Navigation */}
-            {!readOnly && (
-              <div className="mb-6">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'read' | 'edit')}>
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="read" className="flex items-center space-x-2">
-                      <BookOpen className="h-4 w-4" />
-                      <span>Read Course</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="edit" className="flex items-center space-x-2">
-                      <Edit3 className="h-4 w-4" />
-                      <span>Edit Content</span>
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-            )}
-
-            {/* Tab Content */}
-            {activeTab === 'edit' && !readOnly ? (
-              <SimpleCourseEditor
-                courseContent={courseContent}
-                onContentChange={(newContent) => {
-                  setCourseContent(newContent);
-                  setHasUnsavedChanges(true);
-                }}
-                onSave={handleSaveChanges}
-                readOnly={false}
-              />
-            ) : (
-              <>
-                {isEditing && editingSubsection ? (
-              /* Edit Mode */
-              <div className="bg-white rounded-lg shadow-lg border border-gray-200 min-h-[600px] p-8">
-                <div className="mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Edit Topic</h2>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Topic Title
-                      </label>
-                      <Input
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        placeholder="Enter topic title"
-                        className="w-full"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Content (HTML supported)
-                      </label>
-                      <Textarea
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        placeholder="Enter content with HTML formatting"
-                        rows={15}
-                        className="w-full font-mono text-sm"
-                      />
-                    </div>
-                    
-                    <div className="flex space-x-3">
-                      <Button onClick={handleSaveEdit} className="flex items-center space-x-2">
-                        <Save className="h-4 w-4" />
-                        <span>Save Changes</span>
-                      </Button>
-                      <Button onClick={handleCancelEdit} variant="outline" className="flex items-center space-x-2">
-                        <X className="h-4 w-4" />
-                        <span>Cancel</span>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* Reading Mode */
-              <div className="bg-white rounded-lg shadow-lg border border-gray-200 min-h-[600px]">
-                <div className="p-8">
-                  <div 
-                    className="prose prose-xl max-w-none"
-                    style={{
-                      fontSize: '18px',
-                      lineHeight: '1.7',
-                      color: '#374151'
-                    }}
-                    dangerouslySetInnerHTML={{ 
-                      __html: currentContent.content
-                        .replace(/<h1>/g, '<h1 style="font-size: 2.5rem; font-weight: 700; margin: 2rem 0 1.5rem 0; color: #111827; line-height: 1.2;">')
-                        .replace(/<h2>/g, '<h2 style="font-size: 2rem; font-weight: 600; margin: 1.75rem 0 1rem 0; color: #1f2937; line-height: 1.3;">')
-                        .replace(/<h3>/g, '<h3 style="font-size: 1.5rem; font-weight: 600; margin: 1.5rem 0 0.75rem 0; color: #374151; line-height: 1.4;">')
-                        .replace(/<h4>/g, '<h4 style="font-size: 1.25rem; font-weight: 600; margin: 1.25rem 0 0.5rem 0; color: #4b5563; line-height: 1.4;">')
-                        .replace(/<p>/g, '<p style="margin: 1rem 0; line-height: 1.7;">')
-                        .replace(/<ul>/g, '<ul style="margin: 1rem 0; padding-left: 1.5rem; line-height: 1.7;">')
-                        .replace(/<ol>/g, '<ol style="margin: 1rem 0; padding-left: 1.5rem; line-height: 1.7;">')
-                        .replace(/<li>/g, '<li style="margin: 0.5rem 0;">')
-                        .replace(/<strong>/g, '<strong style="font-weight: 600; color: #111827;">')
-                        .replace(/<em>/g, '<em style="font-style: italic; color: #4b5563;">')
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-                
-            {/* Quiz Button */}
-            {!isEditing && currentContent.hasQuiz && (
-              <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <h3 className="font-semibold text-yellow-800 mb-2">Knowledge Check Available</h3>
-                <p className="text-yellow-700 text-sm mb-4">
-                  Test your understanding of this section with a quick quiz.
-                </p>
-                <Button
-                  onClick={() => setShowQuiz(true)}
-                  className="bg-yellow-600 hover:bg-yellow-700"
-                >
-                  Take Quiz
-                </Button>
-              </div>
-            )}
-
-            {/* Navigation Controls */}
-            {!isEditing && (
-              <div className="flex justify-between items-center mt-6">
-                <Button
-                  variant="outline"
-                  onClick={navigatePrevious}
-                  disabled={!canNavigatePrevious}
-                  className="flex items-center space-x-2"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  <span>Previous</span>
-                </Button>
-
-                <div className="text-sm text-gray-500">
-                  Section {currentSectionIndex + 1} of {courseContent.length}
-                </div>
-
-                <Button
-                  onClick={navigateNext}
-                  disabled={!canNavigateNext}
-                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
           </div>
         </div>
       </div>
-    </>
-    )}
-      
-      {/* Add Topic Modal */}
-      {showAddTopic && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold mb-4">Add New Topic</h3>
-            
-            <div className="space-y-4">
+
+      {/* Main Content */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Course Overview */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <BookOpen className="h-5 w-5 text-green-500" />
+              <span>Course Overview</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Topic Title
-                </label>
-                <Input
-                  value={newTopicTitle}
-                  onChange={(e) => setNewTopicTitle(e.target.value)}
-                  placeholder="Enter topic title"
-                  className="w-full"
-                />
+                <h3 className="font-medium text-gray-900 mb-2">Course Details</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Track Type:</span>
+                    <span className="font-medium">{course.track_type}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Status:</span>
+                    <span className="font-medium capitalize">{course.status}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Created:</span>
+                    <span className="font-medium">{new Date(course.created_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Content (HTML supported)
-                </label>
-                <Textarea
-                  value={newTopicContent}
-                  onChange={(e) => setNewTopicContent(e.target.value)}
-                  placeholder="Enter content with HTML formatting (e.g., <h2>Heading</h2>, <p>Paragraph</p>, <ul><li>List item</li></ul>)"
-                  rows={10}
-                  className="w-full font-mono text-sm"
-                />
-              </div>
-              
-              <div className="flex justify-end space-x-3">
-                <Button
-                  onClick={() => {
-                    setShowAddTopic(false);
-                    setNewTopicTitle('');
-                    setNewTopicContent('');
-                  }}
-                  variant="outline"
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleAddTopic} className="flex items-center space-x-2">
-                  <Plus className="h-4 w-4" />
-                  <span>Add Topic</span>
-                </Button>
-              </div>
+              {course.course_plan && (
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-2">Learning Objectives</h3>
+                  <div className="space-y-2 text-sm">
+                    {course.course_plan.goal && (
+                      <div>
+                        <span className="text-gray-600">Goal:</span>
+                        <p className="text-gray-900 mt-1">{course.course_plan.goal}</p>
+                      </div>
+                    )}
+                    {course.course_plan.industry && (
+                      <div>
+                        <span className="text-gray-600">Industry:</span>
+                        <span className="font-medium ml-2">{course.course_plan.industry}</span>
+                      </div>
+                    )}
+                    {course.course_plan.duration && (
+                      <div className="flex items-center space-x-2">
+                        <Clock className="h-4 w-4 text-gray-500" />
+                        <span className="text-gray-600">Duration:</span>
+                        <span className="font-medium">{course.course_plan.duration}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
-      )}
-      {/* Add Section Modal */}
-      {showAddSection && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-xl font-semibold mb-4">Add New Section</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Section Title
-                </label>
-                <Input
-                  value={newSectionTitle}
-                  onChange={(e) => setNewSectionTitle(e.target.value)}
-                  placeholder="Enter section title"
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description (optional)
-                </label>
-                <Textarea
-                  value={newSectionDescription}
-                  onChange={(e) => setNewSectionDescription(e.target.value)}
-                  placeholder="Enter section description"
-                  rows={3}
-                  className="w-full font-mono text-sm"
-                />
-              </div>
-              <div className="flex justify-end space-x-3">
-                <Button
-                  onClick={() => {
-                    setShowAddSection(false);
-                    setNewSectionTitle('');
-                    setNewSectionDescription('');
-                  }}
-                  variant="outline"
+          </CardContent>
+        </Card>
+
+        {/* Course Sections */}
+        <div className="space-y-6">
+          {courseContent.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Structured Content Available</h3>
+                <p className="text-gray-600">
+                  This course uses AI-powered interactive tutoring. Start a session to begin learning!
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            courseContent.map((section, sectionIndex) => (
+              <Card key={section.id} className="overflow-hidden">
+                <CardHeader 
+                  className="cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => toggleSection(section.id)}
                 >
-                  Cancel
-                </Button>
-                <Button onClick={handleAddSection} className="flex items-center space-x-2">
-                  <Plus className="h-4 w-4" />
-                  <span>Add Section</span>
-                </Button>
-              </div>
-            </div>
-          </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <span className="text-green-600 font-medium text-sm">
+                          {sectionIndex + 1}
+                        </span>
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{section.title}</CardTitle>
+                        <p className="text-sm text-gray-600 mt-1">{section.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {section.subsections.length} Topics
+                      </Badge>
+                      {expandedSections.has(section.id) ? (
+                        <ChevronDown className="h-5 w-5 text-gray-400" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-gray-400" />
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                
+                {expandedSections.has(section.id) && (
+                  <CardContent className="pt-0">
+                    <Separator className="mb-6" />
+                    
+                    <div className="space-y-6">
+                      {section.subsections.map((subsection, subsectionIndex) => (
+                        <div key={subsection.id} className="border-l-4 border-green-200 pl-6">
+                          <div className="flex items-center space-x-2 mb-3">
+                            <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                              <span className="text-white font-medium text-xs">
+                                {subsectionIndex + 1}
+                              </span>
+                            </div>
+                            <h4 className="text-lg font-medium text-gray-900">
+                              {subsection.title}
+                            </h4>
+                            {subsection.hasQuiz && (
+                              <Badge variant="outline" className="text-xs">
+                                Quiz Available
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <div className="bg-gray-50 rounded-lg p-6">
+                            <div 
+                              className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
+                              dangerouslySetInnerHTML={{
+                                __html: `<p>${formatContent(subsection.content)}</p>`
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            ))
+          )}
         </div>
-      )}
+
+        {/* Footer */}
+        <div className="mt-12 text-center">
+          <Card>
+            <CardContent className="py-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Ready to Start Learning?
+              </h3>
+              <p className="text-gray-600 mb-4">
+                This course uses AI-powered interactive tutoring for the best learning experience.
+              </p>
+              <Button 
+                onClick={onBack}
+                className="bg-green-500 hover:bg-green-600"
+              >
+                Start Interactive Session
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
