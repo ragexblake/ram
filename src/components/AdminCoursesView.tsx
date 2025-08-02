@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { BookOpen, Play, Send, Users, Loader2, CheckCircle, Clock, FileText, Globe, Trash2 } from 'lucide-react';
+import { BookOpen, Play, Send, Users, Loader2, CheckCircle, Clock, FileText, Globe, Trash2, Edit3 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -21,6 +21,7 @@ interface AdminCoursesViewProps {
   user: any;
   onStartSession: (course: any) => void;
   onReadCourse?: (course: any) => void;
+  onEditCourse?: (course: any) => void;
 }
 
 interface CourseWithAssignments {
@@ -35,7 +36,7 @@ interface CourseWithAssignments {
   assigned_teams: string[];
 }
 
-const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSession, onReadCourse }) => {
+const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSession, onReadCourse, onEditCourse }) => {
   const [courses, setCourses] = useState<CourseWithAssignments[]>([]);
   const [people, setPeople] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -360,6 +361,14 @@ const AdminCoursesView: React.FC<AdminCoursesViewProps> = ({ user, onStartSessio
           >
             <BookOpen className="h-4 w-4" />
             <span>Read</span>
+          </button>
+
+          <button
+            onClick={() => handleEditCourse(course)}
+            className="flex items-center space-x-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm border"
+          >
+            <Edit3 className="h-4 w-4" />
+            <span>Edit</span>
           </button>
 
           {isDraft ? (

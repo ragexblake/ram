@@ -13,6 +13,7 @@ import AccountSettings from '@/components/AccountSettings';
 import Profile from '@/components/Profile';
 import HonestBox from '@/components/HonestBox';
 import CourseReader from '@/components/CourseReader';
+import CourseEditorPage from '@/components/course-creator/CourseEditorPage';
 
 interface ContentRendererProps {
   activeTab: string;
@@ -28,6 +29,11 @@ interface ContentRendererProps {
     isReading: boolean;
   };
   onExitCourseReader?: () => void;
+  courseEditorData?: {
+    course: any;
+    isEditing: boolean;
+  };
+  onExitCourseEditor?: () => void;
 }
 
 const ContentRenderer: React.FC<ContentRendererProps> = ({
@@ -40,7 +46,9 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   onSessionPerformanceComplete,
   onReadCourse,
   courseReaderData,
-  onExitCourseReader
+  onExitCourseReader,
+  courseEditorData,
+  onExitCourseEditor
 }) => {
   // If in course reading mode, show the course reader
   if (courseReaderData?.isReading && courseReaderData.course) {
@@ -54,13 +62,29 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
     );
   }
 
+  // If in course editing mode, show the course editor
+  if (courseEditorData?.isEditing && courseEditorData.course) {
+    return (
+      <CourseEditorPage
+        course={courseEditorData.course}
+        onBack={onExitCourseEditor || (() => {})}
+        onSave={() => {
+          // Refresh the courses view after saving
+          if (onExitCourseEditor) {
+            onExitCourseEditor();
+          }
+        }}
+      />
+    );
+  }
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard user={profile} onStartSession={onStartSession} />;
       
       case 'courses':
-        return <AdminCoursesView user={profile} onStartSession={onStartSession} onReadCourse={onReadCourse} />;
+        return <AdminCoursesView user={profile} onStartSession={onStartSession} onReadCourse={onReadCourse} onEditCourse={onEditCourse} />;
       
       case 'course-creator':
         return <CourseCreator userId={profile?.id} onCourseCreated={onCourseCreated} />;

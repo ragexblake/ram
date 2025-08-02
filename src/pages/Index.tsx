@@ -22,6 +22,10 @@ const IndexContent: React.FC = () => {
     course: any;
     isReading: boolean;
   }>({ course: null, isReading: false });
+  const [courseEditorData, setCourseEditorData] = useState<{
+    course: any;
+    isEditing: boolean;
+  }>({ course: null, isEditing: false });
 
   useEffect(() => {
     // Check if tab is specified in URL params
@@ -74,6 +78,14 @@ const IndexContent: React.FC = () => {
 
   const handleExitCourseReader = () => {
     setCourseReaderData({ course: null, isReading: false });
+  };
+
+  const handleEditCourse = (course: any) => {
+    setCourseEditorData({ course, isEditing: true });
+  };
+
+  const handleExitCourseEditor = () => {
+    setCourseEditorData({ course: null, isEditing: false });
   };
 
   // Show loading only if auth is not initialized
@@ -145,6 +157,8 @@ const IndexContent: React.FC = () => {
         onReadCourse={handleReadCourse}
         courseReaderData={courseReaderData}
         onExitCourseReader={handleExitCourseReader}
+        courseEditorData={courseEditorData}
+        onExitCourseEditor={handleExitCourseEditor}
       />
     </MainLayout>
   );

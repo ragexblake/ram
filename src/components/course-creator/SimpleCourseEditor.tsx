@@ -528,12 +528,12 @@ const SimpleCourseEditor: React.FC<SimpleCourseEditorProps> = ({
                                   <Textarea
                                     value={subsection.content}
                                     onChange={(e) => updateSubsection(section.id, subsection.id, { content: e.target.value })}
-                                    placeholder="Enter the content for this topic. You can use simple text formatting like paragraphs, lists, and headings."
+                                    placeholder="Enter the content for this topic as plain text. Use line breaks for paragraphs."
                                     rows={12}
-                                    className="font-mono text-sm w-full min-w-full resize-none"
+                                    className="text-sm w-full min-w-full resize-none"
                                   />
                                   <p className="text-xs text-gray-500 mt-1">
-                                    Tip: Use simple text formatting. No HTML required.
+                                    Tip: Use plain text only. Line breaks will be preserved.
                                   </p>
                                 </div>
                                 <div className="flex space-x-2">

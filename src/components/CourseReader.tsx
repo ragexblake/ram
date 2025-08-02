@@ -119,14 +119,6 @@ const CourseReader: React.FC<CourseReaderProps> = ({
     setExpandedSections(newExpanded);
   };
 
-  const formatContent = (content: string) => {
-    // Convert simple text formatting to HTML
-    return content
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/\n\n/g, '</p><p>')
-      .replace(/\n/g, '<br/>');
-  };
 
   if (loading) {
     return (
@@ -307,12 +299,9 @@ const CourseReader: React.FC<CourseReaderProps> = ({
                           </div>
                           
                           <div className="bg-gray-50 rounded-lg p-6">
-                            <div 
-                              className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-                              dangerouslySetInnerHTML={{
-                                __html: `<p>${formatContent(subsection.content)}</p>`
-                              }}
-                            />
+                            <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed whitespace-pre-wrap">
+                              {subsection.content}
+                            </div>
                           </div>
                         </div>
                       ))}
